@@ -1,0 +1,131 @@
+#{"msg_id":2,"token":%s, "type":"camera_clock", "param":"2008-01-03 03:57:16"}
+
+{"msg_id":2,"token":%s, "type":"video_standard", "param":"PAL"}
+#{"msg_id":2,"token":%s, "type":"video_standard", "param":"NTSC"}
+
+
+{"msg_id":2,"token":%s, "type":"video_resolution", "param":"1920x1080 60P 16:9"}
+#{"msg_id":2,"token":%s, "type":"video_resolution", "param":"1920x1080 30P 16:9"}
+#{"msg_id":2,"token":%s, "type":"video_resolution", "param":"1920x1080 48P 16:9"}
+#{"msg_id":2,"token":%s, "type":"video_resolution", "param":"1920x1080 24P 16:9"}
+#{"msg_id":2,"token":%s, "type":"video_resolution", "param":"1280x960 60P 4:3"}
+#{"msg_id":2,"token":%s, "type":"video_resolution", "param":"1280x960 48P 4:3"}
+#{"msg_id":2,"token":%s, "type":"video_resolution", "param":"1280x720 60P 16:9"}
+#{"msg_id":2,"token":%s, "type":"video_resolution", "param":"1280x720 48P 16:9"}
+#{"msg_id":2,"token":%s, "type":"video_resolution", "param":"1280x720 120P 16:9"}
+#{"msg_id":2,"token":%s, "type":"video_resolution", "param":"848x480 240P 16:9"}
+
+{"msg_id":2,"token":%s, "type":"video_stamp", "param":"off"}
+#{"msg_id":2,"token":%s, "type":"video_stamp", "param":"date"}
+#{"msg_id":2,"token":%s, "type":"video_stamp", "param":"time"}
+#{"msg_id":2,"token":%s, "type":"video_stamp", "param":"date\/time"}
+
+{"msg_id":2,"token":%s, "type":"video_quality", "param":"S.Fine"}
+#{"msg_id":2,"token":%s, "type":"video_quality", "param":"Fine"}
+#{"msg_id":2,"token":%s, "type":"video_quality", "param":"Normal"}
+
+{"msg_id":2,"token":%s, "type":"timelapse_video", "param":"off"}
+{"msg_id":2,"token":%s, "type":"timelapse_video", "param":"2"}
+
+{"msg_id":2,"token":%s, "type":"capture_mode", "param":"precise quality"}
+#{"msg_id":2,"token":%s, "type":"capture_mode", "param":"precise quality cont."}
+#{"msg_id":2,"token":%s, "type":"capture_mode", "param":"burst quality"}
+#{"msg_id":2,"token":%s, "type":"capture_mode", "param":"precise self quality"}
+
+{"msg_id":2,"token":%s, "type":"photo_size", "param":"16M (4608x3456 4:3)"}
+#{"msg_id":2,"token":%s, "type":"photo_size", "param":"13M (4128x3096 4:3)"}
+#{"msg_id":2,"token":%s, "type":"photo_size", "param":"8M (3264x2448 4:3)"}
+#{"msg_id":2,"token":%s, "type":"photo_size", "param":"5M (2560x1920 4:3)"}
+
+{"msg_id":2,"token":%s, "type":"photo_stamp", "param":"off"}
+#{"msg_id":2,"token":%s, "type":"photo_stamp", "param":"date"}
+#{"msg_id":2,"token":%s, "type":"photo_stamp", "param":"time"}
+#{"msg_id":2,"token":%s, "type":"photo_stamp", "param":"date\/time"}
+
+{"msg_id":2,"token":%s, "type":"photo_quality", "param":"S.Fine"}
+#{"msg_id":2,"token":%s, "type":"photo_quality", "param":"Fine"}
+#{"msg_id":2,"token":%s, "type":"photo_quality", "param":"Normal"}
+
+{"msg_id":2,"token":%s, "type":"preview_status", "param":"on"}
+{"msg_id":2,"token":%s, "type":"preview_status", "param":"off"}
+
+{"msg_id":2,"token":%s, "type":"buzzer_volume", "param":"high"}
+#{"msg_id":2,"token":%s, "type":"buzzer_volume", "param":"low"}
+#{"msg_id":2,"token":%s, "type":"buzzer_volume", "param":"mute"}
+
+{"msg_id":2,"token":%s, "type":"buzzer_ring", "param":"on"}
+{"msg_id":2,"token":%s, "type":"buzzer_ring", "param":"off"}
+
+{"msg_id":2,"token":%s, "type":"capture_default_mode", "param":"precise quality"}
+#{"msg_id":2,"token":%s, "type":"capture_default_mode", "param":"precise quality cont."}
+#{"msg_id":2,"token":%s, "type":"capture_default_mode", "param":"burst quality"}
+#{"msg_id":2,"token":%s, "type":"capture_default_mode", "param":"precise self quality"}
+
+{"msg_id":2,"token":%s, "type":"precise_cont_time", "param":"0.5 sec"}
+#{"msg_id":2,"token":%s, "type":"precise_cont_time", "param":"1.0 sec"}
+#{"msg_id":2,"token":%s, "type":"precise_cont_time", "param":"2.0 sec"}
+#{"msg_id":2,"token":%s, "type":"precise_cont_time", "param":"5.0 sec"}
+#{"msg_id":2,"token":%s, "type":"precise_cont_time", "param":"10.0 sec"}
+#{"msg_id":2,"token":%s, "type":"precise_cont_time", "param":"30.0 sec"}
+#{"msg_id":2,"token":%s, "type":"precise_cont_time", "param":"60.0 sec"}
+
+{"msg_id":2,"token":%s, "type":"burst_capture_number", "param":"3 p \/s"}
+#{"msg_id":2,"token":%s, "type":"burst_capture_number", "param":"5 p \/ s"}
+#{"msg_id":2,"token":%s, "type":"burst_capture_number", "param":"7 p \/ s"}
+#{"msg_id":2,"token":%s, "type":"burst_capture_number", "param":"7 p \/ 2s"}
+
+#{"msg_id":2,"token":%s, "type":"restore_factory_settings", "param":"on"}
+
+{"msg_id":2,"token":%s, "type":"led_mode", "param":"all enable"}
+#{"msg_id":2,"token":%s, "type":"led_mode", "param":"all disable"}
+#{"msg_id":2,"token":%s, "type":"led_mode", "param":"status enable"}
+
+#{"msg_id":2,"token":%s, "type":"dev_reboot", "param":"on"}
+
+{"msg_id":2,"token":%s, "type":"meter_mode", "param":"center"}
+#{"msg_id":2,"token":%s, "type":"meter_mode", "param":"average"}
+#{"msg_id":2,"token":%s, "type":"meter_mode", "param":"spot"}
+
+#{"msg_id":2,"token":%s, "type":"video_output_dev_type", "param":"hdmi"}
+#{"msg_id":2,"token":%s, "type":"video_output_dev_type", "param":"tv"}
+{"msg_id":2,"token":%s, "type":"video_output_dev_type", "param":"off"}
+
+{"msg_id":2,"token":%s, "type":"auto_low_light", "param":"on"}
+#{"msg_id":2,"token":%s, "type":"auto_low_light", "param":"off"}
+
+#{"msg_id":2,"token":%s, "type":"loop_record", "param":"on"}
+{"msg_id":2,"token":%s, "type":"loop_record", "param":"off"}
+
+{"msg_id":2,"token":%s, "type":"warp_enable", "param":"on"}
+#{"msg_id":2,"token":%s, "type":"warp_enable", "param":"off"}
+
+{"msg_id":2,"token":%s, "type":"precise_selftime", "param":"3s"}
+#{"msg_id":2,"token":%s, "type":"precise_selftime", "param":"5s"}
+#{"msg_id":2,"token":%s, "type":"precise_selftime", "param":"10s"}
+#{"msg_id":2,"token":%s, "type":"precise_selftime", "param":"15s"}
+
+{"msg_id":2,"token":%s, "type":"precise_self_running", "param":"on"}
+#{"msg_id":2,"token":%s, "type":"precise_self_running", "param":"off"}
+
+{"msg_id":2,"token":%s, "type":"auto_power_off", "param":"off"}
+#{"msg_id":2,"token":%s, "type":"auto_power_off", "param":"3 minutes"}
+#{"msg_id":2,"token":%s, "type":"auto_power_off", "param":"5 minutes"}
+#{"msg_id":2,"token":%s, "type":"auto_power_off", "param":"10 minutes"}
+
+{"msg_id":2,"token":%s, "type":"system_mode", "param":"capture"}
+#{"msg_id":2,"token":%s, "type":"system_mode", "param":"record"}
+
+{"msg_id":2,"token":%s, "type":"system_default_mode", "param":"capture"}
+#{"msg_id":2,"token":%s, "type":"system_default_mode", "param":"record"}
+
+#{"msg_id":2,"token":%s, "type":"start_wifi_while_booted", "param":"on"}
+{"msg_id":2,"token":%s, "type":"start_wifi_while_booted", "param":"off"}
+
+#{"msg_id":2,"token":%s, "type":"video_rotate", "param":"on"}
+{"msg_id":2,"token":%s, "type":"video_rotate", "param":"off"}
+
+#{"msg_id":2,"token":%s, "type":"emergency_file_backup", "param":"on"}
+{"msg_id":2,"token":%s, "type":"emergency_file_backup", "param":"off"}
+
+#{"msg_id":2,"token":%s, "type":"osd_enable", "param":"on"}
+{"msg_id":2,"token":%s, "type":"osd_enable", "param":"off"}
