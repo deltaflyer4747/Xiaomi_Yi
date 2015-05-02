@@ -4,6 +4,9 @@ Xiaomi Yi Camera settings&control via python (PC) scripts
 
 For this script you need Python 2.7.x https://www.python.org/downloads/ 
 
+Windows Notepad is derping about newline style, use something better than that, like Notepad++, PsPad, or even WordPad
+
+
 
 Edit settings.py with your camera IP. No need to launch this script
 
