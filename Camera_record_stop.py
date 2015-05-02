@@ -3,7 +3,9 @@
 #
 # Res Andy 
 
-import os, re, sys, time, socket, settings
+import os, re, sys, time, socket
+from settings import camaddr
+from settings import camport
 
 
 srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
