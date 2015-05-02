@@ -22,7 +22,11 @@ else:
 	if "rval" in data:
 		token = re.findall('"param": (.+) }',data)[0]	
 
-filek = open("options.txt","r").readlines()
+filet = open("options.txt","r").read()
+if "\r\n" in filet:
+	filek = filet.split("\r\n")
+else:
+	filek = filet.split("\n")
 
 for line in filek:
 	if len(line) > 5:
