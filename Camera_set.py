@@ -3,11 +3,7 @@
 #
 # Res Andy 
 
-import os, re, sys, time, socket
-
-
-camaddr = "192.168.42.1"
-camport = 7878
+import os, re, sys, time, socket, settings
 
 srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 srv.connect((camaddr, camport))
@@ -32,5 +28,8 @@ for line in filek:
 	if len(line) > 5:
 		if not line.startswith("#"):
 			tosend = line %token
+#			print tosend
 			srv.send(tosend)
 			srv.recv(512)
+#			print srv.recv(512)
+#			print
