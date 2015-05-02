@@ -17,9 +17,10 @@ srv.send('{"msg_id":257,"token":0}')
 data = srv.recv(512)
 if "rval" in data:
 	token = re.findall('"param": (.+) }',data)[0]	
-data = srv.recv(512)
-if "rval" in data:
-	token = re.findall('"param": (.+) }',data)[0]	
+else:
+	data = srv.recv(512)
+	if "rval" in data:
+		token = re.findall('"param": (.+) }',data)[0]	
 
 
 
