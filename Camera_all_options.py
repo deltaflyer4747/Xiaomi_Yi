@@ -3,11 +3,7 @@
 #
 # Res Andy 
 
-import os, re, sys, time, socket
-
-
-camaddr = "192.168.42.1"
-camport = 7878
+import os, re, sys, time, socket, settings
 
 srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 srv.connect((camaddr, camport))
@@ -42,4 +38,11 @@ for mytag in myconf:
 		tosend = '{"msg_id":3,"token":%s,"param":"%s"}' %(token, paramname) 
 		srv.send(tosend)
 		print srv.recv(8192)
- 
+
+
+print "_____________________________________________"
+print 
+print "press CTRL+C to close"
+
+while 1:
+	time.sleep(1)
