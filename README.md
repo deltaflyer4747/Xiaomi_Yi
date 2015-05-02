@@ -1,5 +1,5 @@
 # Xiaomi_Yi
-Xiaomi Yi Camera settings&control via python (PC) script
+Xiaomi Yi Camera settings&control via python (PC) scripts
 
 
 For this script you need Python 2.7.x https://www.python.org/downloads/ 
