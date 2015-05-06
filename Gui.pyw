@@ -4,8 +4,6 @@
 # Res Andy 
 
 import os, re, time, socket, subprocess, sys, threading, webbrowser
-from settings import camaddr
-from settings import camport
 from Tkinter import *
 import tkMessageBox
 
@@ -112,8 +110,8 @@ class App:
 				raise Exception('Connection', 'failed') #throw an exception	
 	
 			filet = open("settings.cfg","w")
-			filet.write('camaddr = %s\r\n' %camaddr) 
-			filet.write('camport = %s\r\n' %camport)
+			filet.write('camaddr = %s\r\n' %self.camaddr) 
+			filet.write('camport = %s\r\n' %self.camport)
 			filet.close()
 			self.status.config(text="Connected") #display status message in statusbar
 			self.status.update_idletasks()
@@ -280,6 +278,8 @@ class App:
 		self.bphoto.pack(side=LEFT, padx=10, pady=5)
 		self.controlbuttons.pack(side=TOP, fill=X)
 		self.content.pack(side=TOP, fill=X)
+	
+	
 	
 	
 root = Tk()
