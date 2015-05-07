@@ -13,6 +13,8 @@ class App:
 		self.token = ""
 		self.connected = False
 		self.camconfig = {}
+		self.defaultbg = master.cget('bg')
+		self.camsettableconfig = {}
 		self.DonateUrl = "http://sw.deltaflyer.cz/donate.html"
 		self.master = master
 		self.master.geometry("450x250+300+250")
@@ -81,6 +83,17 @@ class App:
 		self.helpmenu.add_command(label="About...", command=self.AboutProg)
 				
 
+	def GetAllConfig(self):
+		for param in self.camconfig.keys():
+			tosend = '{"msg_id":3,"token":%s,"param":"%s"}' %(self.token, param)
+			self.srv.send(tosend)
+			thisresponse = self.srv.recv(512)
+			if '": "settable:' in thisresponse:
+				settable, thisoptions = re.findall('": "(.+?):(.+)" } ] }', thisresponse)[0]
+				allparams = thisoptions.split("#")
+				self.camsettableconfig[param]=allparams
+
+
 	def ReadConfig(self):
 		tosend = '{"msg_id":3,"token":%s}' %self.token 
 		self.srv.send(tosend)
@@ -95,7 +108,7 @@ class App:
 		for mytag in myconf:
 			param, value = re.findall(' { "(.+)": "(.+)" }', mytag)[0]
 			self.camconfig[param]=value
-
+			
 
 	def callback(self):
 		print "called the callback!"
@@ -200,7 +213,7 @@ class App:
 		self.topbuttons = Frame(self.mainwindow, bg="#aaaaff")
 		b = Button(self.topbuttons, text="Control", width=7, command=self.MenuControl)
 		b.pack(side=LEFT, padx=10, pady=5)
-		b = Button(self.topbuttons, text="Configure", width=7, command=self.MenuConfig, state=DISABLED)
+		b = Button(self.topbuttons, text="Configure", width=7, command=self.MenuConfig)
 		b.pack(side=LEFT, padx=10, pady=5)
 		self.topbuttons.pack(side=TOP, fill=X)
 		self.mainwindow.pack(side=TOP, fill=X)
@@ -211,6 +224,7 @@ class App:
 			self.content.destroy()
 		except:
 			pass
+		self.ReadConfig()
 		self.content = Frame(self.mainwindow)
 		self.controlbuttons = Frame(self.content)
 		self.bphoto = Button(self.controlbuttons, text="Take a \nPHOTO", width=7, command=self.ActionPhoto, bg="#ccccff")
@@ -284,15 +298,83 @@ class App:
 			else:
 				tkMessageBox.showinfo("Live View", "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %(self.camaddr))
 	
+
+
+	def MenuConfig_Apply(self, *args):
+		myoption = self.config_thisoption.get()
+		myvalue = self.config_thisvalue.get()
+		
+		if myoption == "camera_clock":
+			myvalue = time.strftime("%Y-%m-%d %H:%M:%S")
+		tosend = '{"msg_id":2,"token":%s, "type":"%s", "param":"%s"}' %(self.token, myoption, myvalue)
+		self.srv.send(tosend)
+		self.srv.recv(512)
+		self.ReadConfig()
+
+	def MenuConfig_changed(self, *args):
+		myoption = self.config_thisoption.get()
+		
+		self.config_values = self.camsettableconfig[myoption]
+		self.config_thisvalue.set(self.camconfig[myoption]) # default value
+		if myoption == "video_resolution": #NTSC/PAL resolution check
+			self.config_note.config(text='*video_resolution is limited by selected video_standard', bg="#ffff88")
+			for checkvalue in self.config_values:
+				if self.camconfig["video_standard"] == "NTSC":
+					if "24P" in checkvalue or "48P" in checkvalue:
+						self.config_values.remove(checkvalue)
+				elif self.camconfig["video_standard"] == "PAL":
+					if "24P" not in checkvalue or "48P" not in checkvalue:
+						self.config_values.remove(checkvalue)
+		elif myoption == "video_standard":
+			self.config_note.config(text='*video_standard limits video_resolution options', bg="#ffff88")
+		elif myoption == "start_wifi_while_booted":
+			self.config_note.config(text='*This affects connection by this program', bg="#ffff88")
+		elif myoption == "preview_status":
+			self.config_note.config(text='*Turn this on to enable LIVE view', bg="#ffff88")
+		elif myoption == "camera_clock":
+			self.config_note.config(text='*Click Apply to set Camera clock to the same as this PC', bg="#ffff88")
+		else:
+			self.config_note.config(text='', bg=self.defaultbg)
+		menu = self.config_valuebox['menu']
+		menu.delete(0, END)
+		for value in self.config_values:
+			menu.add_command(label=value, command=lambda value=value: self.config_thisvalue.set(value))
+
 	def MenuConfig(self):
+		self.ReadConfig()
+		self.GetAllConfig()
 		try:
 			self.content.destroy()
 		except:
 			pass
 		self.content = Frame(self.mainwindow)
+
+		self.controlnote = Frame(self.content, height=20)
+		self.config_note = Label(self.controlnote, width=55, text="", anchor=W)
+		self.config_note.pack(side=LEFT, fill=X, padx=10)
+		self.controlnote.pack(side=TOP, fill=X)
+		
+		self.controlselect = Frame(self.content)
+		self.config_options = sorted(self.camsettableconfig.keys())
+		self.config_values = self.camsettableconfig[self.config_options[0]]
+		self.config_thisoption = StringVar(self.controlselect)
+		self.config_thisoption.trace("w", self.MenuConfig_changed)
+		self.config_optionbox = OptionMenu(self.controlselect, self.config_thisoption, *self.config_options)
+		self.config_optionbox.config(width=20)
+		self.config_optionbox.pack(side=LEFT, padx=10, pady=5)
+		self.config_thisvalue = StringVar(self.controlselect)
+		self.config_thisvalue.set(self.camconfig[self.config_options[0]]) # default value
+		self.config_valuebox = OptionMenu(self.controlselect, self.config_thisvalue, '')
+		self.config_thisoption.set(self.config_options[0]) # default value
+		self.config_valuebox.config(width=20)
+		self.config_valuebox.pack(side=LEFT, padx=10, pady=5)
+
+
+		self.controlselect.pack(side=TOP, fill=X)
+
 		self.controlbuttons = Frame(self.content)
-		self.bphoto = Button(self.controlbuttons, text="Nope :-P", width=7, command=self.ActionPhoto)
-		self.bphoto.pack(side=LEFT, padx=10, pady=5)
+		self.config_apply = Button(self.controlbuttons, text="Apply", width=7, command=self.MenuConfig_Apply)
+		self.config_apply.pack(side=LEFT, padx=10, pady=5)
 		self.controlbuttons.pack(side=TOP, fill=X)
 		self.content.pack(side=TOP, fill=X)
 	
