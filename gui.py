@@ -3,7 +3,7 @@
 #
 # Res Andy 
 
-import base64, os, re, socket, subprocess, sys, tempfile, threading, time, webbrowser, zlib
+import base64, os, platform, re, socket, subprocess, sys, tempfile, threading, time, webbrowser, zlib
 from Tkinter import *
 import tkMessageBox
 
@@ -161,17 +161,15 @@ class App:
 	def UpdateUsage(self):
 		tosend = '{"msg_id":5,"token":%s,"type":"total"}' %self.token
 		self.srv.send(tosend)
-		while 1:
+		data = ""
+		while ("param" not in data and '"msg_id": 5' not in data):
 			data = self.srv.recv(512)
-			if "param" in data and '"msg_id": 5' in data:
-				break
 		totalspace = int(re.findall('"param": (.+) }', data)[0])
 		tosend = '{"msg_id":5,"token":%s,"type":"free"}' %self.token
 		self.srv.send(tosend)
-		while 1:
+		data = ""
+		while ("param" not in data and '"msg_id": 5' not in data):
 			data = self.srv.recv(512)
-			if "param" in data and '"msg_id": 5' in data:
-				break
 		freespace = float(re.findall('"param": (.+) }', data)[0])
 		usedspace = totalspace-freespace
 		totalpre = 0
@@ -196,10 +194,9 @@ class App:
 	def UpdateBattery(self):
 		tosend = '{"msg_id":13,"token":%s}' %self.token
 		self.srv.send(tosend)
-		while 1:
+		data = ""
+		while ("param" not in data and '"msg_id":13' not in data):
 			data = self.srv.recv(512)
-			if "param" in data and '"msg_id":13' in data:
-				break
 		Ctype, charge = re.findall('"type":"(.+)","param":"(.+)"}', data)[0]
 		if Ctype == "adapter":
 			Ctype = "Charging"
@@ -297,15 +294,25 @@ class App:
 				else:
 					tkMessageBox.showinfo("Live View", "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %(self.camaddr))
 			else:
-				if os.path.isfile("c:/Program Files/VideoLan/VLC/vlc.exe"):
-					torun = '"c:/Program Files/VideoLan/VLC/vlc.exe" rtsp://%s:554/live' %(self.camaddr) 
-					subprocess.Popen(torun, shell=True)
-				else:
-					if os.path.isfile("c:/Program Files (x86)/VideoLan/VLC/vlc.exe"):
-						torun = '"c:/Program Files (x86)/VideoLan/VLC/vlc.exe" rtsp://%s:554/live' %(self.camaddr)
+				mysys = platform.system()
+				if mysys == "Windows":
+					if os.path.isfile("c:/Program Files/VideoLan/VLC/vlc.exe"):
+						torun = '"c:/Program Files/VideoLan/VLC/vlc.exe" rtsp://%s:554/live' %(self.camaddr) 
+						subprocess.Popen(torun, shell=True)
+					else:
+						if os.path.isfile("c:/Program Files (x86)/VideoLan/VLC/vlc.exe"):
+							torun = '"c:/Program Files (x86)/VideoLan/VLC/vlc.exe" rtsp://%s:554/live' %(self.camaddr)
+							subprocess.Popen(torun, shell=True)
+						else:
+							tkMessageBox.showinfo("Live View", "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %(self.camaddr))
+				elif mysys == "Darwin":
+					if os.path.isfile("/Applications/VLC.app/Contents/MacOS/VLC"):
+						torun = '"/Applications/VLC.app/Contents/MacOS/VLC" rtsp://%s:554/live' %(self.camaddr)
 						subprocess.Popen(torun, shell=True)
 					else:
 						tkMessageBox.showinfo("Live View", "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %(self.camaddr))
+				else:
+					tkMessageBox.showinfo("Live View", "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %(self.camaddr))
 		except Exception:
 			tkMessageBox.showinfo("Live View", "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %(self.camaddr))
 	
