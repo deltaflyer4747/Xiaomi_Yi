@@ -66,14 +66,14 @@ class App:
 		self.menu = Menu(self.master)
 		root.config(menu=self.menu)
 		
-		self.filemenu = Menu(self.menu)
-		self.menu.add_cascade(label="Camera", menu=self.filemenu)
-#		self.filemenu.add_command(label="New", command=self.callback)
-#		self.filemenu.add_command(label="Open...", command=self.callback)
-		self.filemenu.add_separator()
-		self.filemenu.add_command(label="Exit", command=self.quit)
+		self.Cameramenu = Menu(self.menu, tearoff=0)
+		self.menu.add_cascade(label="Camera", menu=self.Cameramenu)
+		self.Cameramenu.add_command(label="Format", command=self.ActionFormat, state=DISABLED)
+#		self.Cameramenu.add_command(label="Open...", command=self.callback)
+		self.Cameramenu.add_separator()
+		self.Cameramenu.add_command(label="Exit", command=self.quit)
 		
-		self.helpmenu = Menu(self.menu)
+		self.helpmenu = Menu(self.menu, tearoff=0)
 		self.menu.add_cascade(label="Help", menu=self.helpmenu)
 		
 		self.helpmenu.add_command(label="Donate", command=lambda aurl=self.DonateUrl:webbrowser.open_new(aurl))
@@ -116,6 +116,7 @@ class App:
 			self.status.config(text="Connected") #display status message in statusbar
 			self.status.update_idletasks()
 			self.camconn.destroy() #hide connection selection
+			self.Cameramenu.entryconfig(0, state="normal")
 			self.connected = True
 			self.UpdateUsage()
 			self.UpdateBattery()
@@ -225,6 +226,13 @@ class App:
 		self.controlbuttons.pack(side=TOP, fill=X)
 		self.content.pack(side=TOP, fill=X)
 	
+	def ActionFormat(self):
+		if tkMessageBox.askyesno("Format memory card", "Are you sure you want to\nFORMAT MEMORY CARD?\n\nThis action can't be undone\nand will erase ALL DATA!"):
+			tosend = '{"msg_id":4,"token":%s}' %self.token
+			self.srv.send(tosend)
+			self.srv.recv(512)
+		self.UpdateUsage()
+
 	def ActionPhoto(self):
 		tosend = '{"msg_id":769,"token":%s}' %self.token
 		self.srv.send(tosend)
