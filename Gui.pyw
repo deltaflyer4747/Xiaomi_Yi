@@ -332,17 +332,20 @@ class App:
 	def MenuConfig_changed(self, *args):
 		myoption = self.config_thisoption.get()
 		
-		self.config_values = self.camsettableconfig[myoption]
+#		config_values = []
+#		for singlevalue in self.camsettableconfig[myoption]: config_values.append(singlevalue)
+		config_values = list(self.camsettableconfig[myoption])
+		config_values_check = list(config_values)
 		self.config_thisvalue.set(self.camconfig[myoption]) # default value
 		if myoption == "video_resolution": #NTSC/PAL resolution check
 			self.config_note.config(text='*video_resolution is limited by selected video_standard', bg="#ffff88")
-			for checkvalue in self.config_values:
+			for checkvalue in config_values_check:
 				if self.camconfig["video_standard"] == "NTSC":
 					if "24P" in checkvalue or "48P" in checkvalue:
-						self.config_values.remove(checkvalue)
+						config_values.remove(checkvalue)
 				elif self.camconfig["video_standard"] == "PAL":
 					if "24P" not in checkvalue or "48P" not in checkvalue:
-						self.config_values.remove(checkvalue)
+						config_values.remove(checkvalue)
 		elif myoption == "video_standard":
 			self.config_note.config(text='*video_standard limits video_resolution options', bg="#ffff88")
 		elif myoption == "start_wifi_while_booted":
@@ -355,7 +358,7 @@ class App:
 			self.config_note.config(text='', bg=self.defaultbg)
 		menu = self.config_valuebox['menu']
 		menu.delete(0, END)
-		for value in self.config_values:
+		for value in config_values:
 			menu.add_command(label=value, command=lambda value=value: self.config_thisvalue.set(value))
 
 	def MenuConfig(self):
@@ -374,7 +377,6 @@ class App:
 		
 		self.controlselect = Frame(self.content)
 		self.config_options = sorted(self.camsettableconfig.keys())
-		self.config_values = self.camsettableconfig[self.config_options[0]]
 		self.config_thisoption = StringVar(self.controlselect)
 		self.config_thisoption.trace("w", self.MenuConfig_changed)
 		self.config_optionbox = OptionMenu(self.controlselect, self.config_thisoption, *self.config_options)
