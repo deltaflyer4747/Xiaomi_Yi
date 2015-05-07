@@ -35,16 +35,13 @@ class App:
 				filek = filet.split("\r\n")
 			else:
 				filek = filet.split("\n")
+			
 			for param in filek:
 				if len(param) > 4:
 					pname, pvalue = re.findall ("(.+) = (.+)", param)[0]
-					if pname == "camaddr":
-						self.camaddr = pvalue
-					elif pname == "camport":
-						self.camport = pvalue 
-					elif pname == "custom_vlc_path":
-						self.custom_vlc_path = pvalue 
-		except: #no settings file yet, lets create default one & set defaults
+					if pname in ("camaddr", "camport", "custom_vlc_path"): setattr(self, pname, pvalue)
+			if not {"camaddr", "camport", "custom_vlc_path"} < set(filet.split()): raise
+		except Exception: #no settings file yet, lets create default one & set defaults
 			filet = open("settings.cfg","w")
 			filet.write('camaddr = 192.168.42.1\r\n') 
 			filet.write('camport = 7878\r\n')
@@ -52,6 +49,7 @@ class App:
 			filet.close()
 			self.camaddr = "192.168.42.1"
 			self.camport = 7878
+			self.custom_vlc_path = "."
 	
 		self.camconn = Frame(self.master) #create connection window with buttons
 		b = Button(self.camconn, text="Connect", width=7, command=self.CamConnect)
@@ -101,10 +99,9 @@ class App:
 		tosend = '{"msg_id":3,"token":%s}' %self.token 
 		self.srv.send(tosend)
 		time.sleep(1)
-		while 1:
+		conf = ""
+		while "param" not in conf:
 			conf = self.srv.recv(6096)
-			if "param" in conf:
-				break
 		conf = conf[36:]
 		myconf = conf.split(",")
 		
@@ -144,6 +141,7 @@ class App:
 			filet = open("settings.cfg","w")
 			filet.write('camaddr = %s\r\n' %self.camaddr) 
 			filet.write('camport = %s\r\n' %self.camport)
+			filet.write('custom_vlc_path = %s\r\n' %self.custom_vlc_path)
 			filet.close()
 			self.status.config(text="Connected") #display status message in statusbar
 			self.status.update_idletasks()
@@ -155,7 +153,7 @@ class App:
 			self.UpdateUsage()
 			self.UpdateBattery()
 			self.MainWindow()
-		except:
+		except Exception:
 			tkMessageBox.showerror("Connect", "Cannot connect to the address specified")
 			self.srv.close()
 	
@@ -225,7 +223,7 @@ class App:
 	def MenuControl(self):
 		try:
 			self.content.destroy()
-		except:
+		except Exception:
 			pass
 		self.ReadConfig()
 		self.content = Frame(self.mainwindow)
@@ -291,19 +289,25 @@ class App:
 		self.srv.send(tosend)
 		self.srv.recv(512)
 		self.srv.recv(512)
-		if self.custom_vlc_path != ".":
-			torun = '"%s" rtsp://%s:554/live' %(self.custom_vlc_path, self.camaddr) 
-			subprocess.Popen(torun, shell=True)
-		else:
-			if os.path.isfile("c:/Program Files/VideoLan/VLC/vlc.exe"):
-				torun = '"c:/Program Files/VideoLan/VLC/vlc.exe" rtsp://%s:554/live' %(self.camaddr) 
-				subprocess.Popen(torun, shell=True)
-			else:
-				if os.path.isfile("c:/Program Files (x86)/VideoLan/VLC/vlc.exe"):
-					torun = '"c:/Program Files (x86)/VideoLan/VLC/vlc.exe" rtsp://%s:554/live' %(self.camaddr)
+		try:
+			if self.custom_vlc_path != ".":
+				if os.path.isfile(self.custom_vlc_path):
+					torun = '"%s" rtsp://%s:554/live' %(self.custom_vlc_path, self.camaddr)
 					subprocess.Popen(torun, shell=True)
 				else:
 					tkMessageBox.showinfo("Live View", "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %(self.camaddr))
+			else:
+				if os.path.isfile("c:/Program Files/VideoLan/VLC/vlc.exe"):
+					torun = '"c:/Program Files/VideoLan/VLC/vlc.exe" rtsp://%s:554/live' %(self.camaddr) 
+					subprocess.Popen(torun, shell=True)
+				else:
+					if os.path.isfile("c:/Program Files (x86)/VideoLan/VLC/vlc.exe"):
+						torun = '"c:/Program Files (x86)/VideoLan/VLC/vlc.exe" rtsp://%s:554/live' %(self.camaddr)
+						subprocess.Popen(torun, shell=True)
+					else:
+						tkMessageBox.showinfo("Live View", "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %(self.camaddr))
+		except Exception:
+			tkMessageBox.showinfo("Live View", "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %(self.camaddr))
 	
 
 
@@ -352,7 +356,7 @@ class App:
 		self.GetAllConfig()
 		try:
 			self.content.destroy()
-		except:
+		except Exception:
 			pass
 		self.content = Frame(self.mainwindow)
 
