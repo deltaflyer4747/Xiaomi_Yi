@@ -42,10 +42,13 @@ class App:
 						self.camaddr = pvalue
 					elif pname == "camport":
 						self.camport = pvalue 
+					elif pname == "custom_vlc_path":
+						self.custom_vlc_path = pvalue 
 		except: #no settings file yet, lets create default one & set defaults
 			filet = open("settings.cfg","w")
 			filet.write('camaddr = 192.168.42.1\r\n') 
 			filet.write('camport = 7878\r\n')
+			filet.write('custom_vlc_path = .\r\n')
 			filet.close()
 			self.camaddr = "192.168.42.1"
 			self.camport = 7878
@@ -288,15 +291,19 @@ class App:
 		self.srv.send(tosend)
 		self.srv.recv(512)
 		self.srv.recv(512)
-		if os.path.isfile("c:/Program Files/VideoLan/VLC/vlc.exe"):
-			torun = '"c:/Program Files/VideoLan/VLC/vlc.exe" rtsp://%s:554/live' %(self.camaddr) 
+		if self.custom_vlc_path != ".":
+			torun = '"%s" rtsp://%s:554/live' %(self.custom_vlc_path, self.camaddr) 
 			subprocess.Popen(torun, shell=True)
 		else:
-			if os.path.isfile("c:/Program Files (x86)/VideoLan/VLC/vlc.exe"):
-				torun = '"c:/Program Files (x86)/VideoLan/VLC/vlc.exe" rtsp://%s:554/live' %(self.camaddr)
+			if os.path.isfile("c:/Program Files/VideoLan/VLC/vlc.exe"):
+				torun = '"c:/Program Files/VideoLan/VLC/vlc.exe" rtsp://%s:554/live' %(self.camaddr) 
 				subprocess.Popen(torun, shell=True)
 			else:
-				tkMessageBox.showinfo("Live View", "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %(self.camaddr))
+				if os.path.isfile("c:/Program Files (x86)/VideoLan/VLC/vlc.exe"):
+					torun = '"c:/Program Files (x86)/VideoLan/VLC/vlc.exe" rtsp://%s:554/live' %(self.camaddr)
+					subprocess.Popen(torun, shell=True)
+				else:
+					tkMessageBox.showinfo("Live View", "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %(self.camaddr))
 	
 
 
