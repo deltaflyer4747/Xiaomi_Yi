@@ -12,6 +12,7 @@ class App:
 	def __init__(self, master):
 		self.token = ""
 		self.connected = False
+		self.camconfig = {}
 		self.DonateUrl = "http://sw.deltaflyer.cz/donate.html"
 		self.master = master
 		self.master.geometry("450x250+300+250")
@@ -69,7 +70,7 @@ class App:
 		self.Cameramenu = Menu(self.menu, tearoff=0)
 		self.menu.add_cascade(label="Camera", menu=self.Cameramenu)
 		self.Cameramenu.add_command(label="Format", command=self.ActionFormat, state=DISABLED)
-#		self.Cameramenu.add_command(label="Open...", command=self.callback)
+		self.Cameramenu.add_command(label="Info", command=self.ActionInfo, state=DISABLED)
 		self.Cameramenu.add_separator()
 		self.Cameramenu.add_command(label="Exit", command=self.quit)
 		
@@ -79,6 +80,21 @@ class App:
 		self.helpmenu.add_command(label="Donate", command=lambda aurl=self.DonateUrl:webbrowser.open_new(aurl))
 		self.helpmenu.add_command(label="About...", command=self.AboutProg)
 				
+
+	def ReadConfig(self):
+		tosend = '{"msg_id":3,"token":%s}' %self.token 
+		self.srv.send(tosend)
+		time.sleep(1)
+		while 1:
+			conf = self.srv.recv(6096)
+			if "param" in conf:
+				break
+		conf = conf[36:]
+		myconf = conf.split(",")
+		
+		for mytag in myconf:
+			param, value = re.findall(' { "(.+)": "(.+)" }', mytag)[0]
+			self.camconfig[param]=value
 
 
 	def callback(self):
@@ -117,7 +133,9 @@ class App:
 			self.status.update_idletasks()
 			self.camconn.destroy() #hide connection selection
 			self.Cameramenu.entryconfig(0, state="normal")
+			self.Cameramenu.entryconfig(1, state="normal")
 			self.connected = True
+			self.ReadConfig()
 			self.UpdateUsage()
 			self.UpdateBattery()
 			self.MainWindow()
@@ -193,39 +211,28 @@ class App:
 			self.content.destroy()
 		except:
 			pass
-		tosend = '{"msg_id":3,"token":%s}' %self.token 
-		self.srv.send(tosend)
-		time.sleep(1)
-		while 1:
-			conf = self.srv.recv(6096)
-			if "param" in conf:
-				break
-		conf = conf[37:]
 		self.content = Frame(self.mainwindow)
 		self.controlbuttons = Frame(self.content)
 		self.bphoto = Button(self.controlbuttons, text="Take a \nPHOTO", width=7, command=self.ActionPhoto, bg="#ccccff")
 		self.bphoto.pack(side=LEFT, padx=10, pady=5)
 		
-		myconf = conf.split(",")
-		
-		for mytag in myconf:
-			if "app_status" in mytag:
-				if "record" in mytag:
-					self.brecord = Button(self.controlbuttons, text="STOP\nRecording", width=7, command=self.ActionRecordStop, bg="#ff6666")
-				else:
-					self.brecord = Button(self.controlbuttons, text="START\nRecording", width=7, command=self.ActionRecordStart, bg="#66ff66")
-				break
+		if "record" in self.camconfig["app_status"]:
+			self.brecord = Button(self.controlbuttons, text="STOP\nRecording", width=7, command=self.ActionRecordStop, bg="#ff6666")
+		else:
+			self.brecord = Button(self.controlbuttons, text="START\nRecording", width=7, command=self.ActionRecordStart, bg="#66ff66")
 		self.brecord.pack(side=LEFT, padx=10, pady=5)
-		for mytag in myconf:
-			if "preview_status" in mytag:
-				if "off" in mytag:
-					self.bstream = Button(self.controlbuttons, text="LIVE\nView", width=7, state=DISABLED)
-				else:
-					self.bstream = Button(self.controlbuttons, text="LIVE\nView", width=7, command=self.ActionVideoStart, bg="#ffff66")
+		if "off" in self.camconfig["preview_status"]:
+			self.bstream = Button(self.controlbuttons, text="LIVE\nView", width=7, state=DISABLED)
+		else:
+			self.bstream = Button(self.controlbuttons, text="LIVE\nView", width=7, command=self.ActionVideoStart, bg="#ffff66")
 		self.bstream.pack(side=LEFT, padx=10, pady=5)
 		self.controlbuttons.pack(side=TOP, fill=X)
 		self.content.pack(side=TOP, fill=X)
 	
+	def ActionInfo(self):
+		tkMessageBox.showinfo("Camera information", "SW ver: %s\nHW ver: %s\nSN: %s" %(self.camconfig["sw_version"], self.camconfig["hw_version"], self.camconfig["serial_number"]))
+		self.UpdateUsage()
+
 	def ActionFormat(self):
 		if tkMessageBox.askyesno("Format memory card", "Are you sure you want to\nFORMAT MEMORY CARD?\n\nThis action can't be undone\nALL PHOTOS & VIDEOS WILL BE LOST!"):
 			tosend = '{"msg_id":4,"token":%s}' %self.token
@@ -249,6 +256,7 @@ class App:
 		self.srv.recv(512)
 		self.brecord.config(text="STOP\nrecording", command=self.ActionRecordStop, bg="#ff6666") #display status message in statusbar
 		self.brecord.update_idletasks()
+		self.ReadConfig()
 
 	def ActionRecordStop(self):
 		tosend = '{"msg_id":514,"token":%s}' %self.token
@@ -258,6 +266,7 @@ class App:
 		self.srv.recv(512)
 		self.brecord.config(text="START\nrecording", command=self.ActionRecordStart, bg="#66ff66") #display status message in statusbar
 		self.brecord.update_idletasks()
+		self.ReadConfig()
 		self.UpdateUsage()
 	
 	def ActionVideoStart(self):
