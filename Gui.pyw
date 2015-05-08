@@ -91,7 +91,7 @@ class App:
 			thisresponse = self.srv.recv(512)
 			if '": "settable:' in thisresponse:
 				settable, thisoptions = re.findall('": "(.+?):(.+)" } ] }', thisresponse)[0]
-				allparams = thisoptions.split("#")
+				allparams = thisoptions.replace("\\/","/").split("#")
 				self.camsettableconfig[param]=allparams
 
 
@@ -324,7 +324,7 @@ class App:
 		
 		if myoption == "camera_clock":
 			myvalue = time.strftime("%Y-%m-%d %H:%M:%S")
-		tosend = '{"msg_id":2,"token":%s, "type":"%s", "param":"%s"}' %(self.token, myoption, myvalue)
+		tosend = '{"msg_id":2,"token":%s, "type":"%s", "param":"%s"}' %(self.token, myoption, myvalue.replace("/","\\/"))
 		self.srv.send(tosend)
 		self.srv.recv(512)
 		self.ReadConfig()
@@ -332,11 +332,9 @@ class App:
 	def MenuConfig_changed(self, *args):
 		myoption = self.config_thisoption.get()
 		
-#		config_values = []
-#		for singlevalue in self.camsettableconfig[myoption]: config_values.append(singlevalue)
 		config_values = list(self.camsettableconfig[myoption])
 		config_values_check = list(config_values)
-		self.config_thisvalue.set(self.camconfig[myoption]) # default value
+		self.config_thisvalue.set(self.camconfig[myoption].replace("\\/","/")) # default value
 		if myoption == "video_resolution": #NTSC/PAL resolution check
 			self.config_note.config(text='*video_resolution is limited by selected video_standard', bg="#ffff88")
 			for checkvalue in config_values_check:
