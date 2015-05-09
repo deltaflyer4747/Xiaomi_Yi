@@ -1,6 +1,10 @@
 # Xiaomi_Yi
 ## Xiaomi Yi Camera settings&control via python (PC) scripts & GUI
 
+### Multiplatform, runs on Windows, Linux and Mac!
+
+#### Control (Photo, Record, Live View), Configure & Manage files via PC.
+
 ### gui.exe is compiled windows binary - NO PYTHON INSTALLATION NEEDED
 
 
