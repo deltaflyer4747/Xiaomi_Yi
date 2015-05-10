@@ -3,7 +3,7 @@
 #
 # Res Andy 
 
-AppVersion = "0.3.1"
+AppVersion = "0.3.2"
 
 import base64, os, platform, re, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -88,17 +88,19 @@ class App:
 		root.config(menu=self.menu)
 		
 		self.Cameramenu = Menu(self.menu, tearoff=0)
-		self.menu.add_cascade(label="Camera", menu=self.Cameramenu)
-		self.Cameramenu.add_command(label="Format", command=self.ActionFormat, state=DISABLED)
-		self.Cameramenu.add_command(label="Info", command=self.ActionInfo, state=DISABLED)
+		self.menu.add_cascade(label="Camera", menu=self.Cameramenu, underline=0)
+		self.Cameramenu.add_command(label="Info", command=self.ActionInfo, state=DISABLED, underline=0)
+		self.Cameramenu.add_command(label="Format", command=self.ActionFormat, state=DISABLED, underline=0)
+		self.Cameramenu.add_command(label="Reboot", command=self.ActionReboot, state=DISABLED, underline=0)
+		self.Cameramenu.add_command(label="Factory settings", command=self.ActionFactory, state=DISABLED, underline=8)
 		self.Cameramenu.add_separator()
-		self.Cameramenu.add_command(label="Exit", command=self.quit)
+		self.Cameramenu.add_command(label="Exit", command=self.quit, underline=1)
 		
 		self.helpmenu = Menu(self.menu, tearoff=0)
-		self.menu.add_cascade(label="Help", menu=self.helpmenu)
+		self.menu.add_cascade(label="Help", menu=self.helpmenu, underline=0)
 		
-		self.helpmenu.add_command(label="Donate", command=lambda aurl=self.DonateUrl:webbrowser.open_new(aurl))
-		self.helpmenu.add_command(label="About...", command=self.AboutProg)
+		self.helpmenu.add_command(label="Donate", command=lambda aurl=self.DonateUrl:webbrowser.open_new(aurl), underline=0)
+		self.helpmenu.add_command(label="About...", command=self.AboutProg, underline=0)
 		self.UpdateCheck()
 				
 
@@ -114,6 +116,18 @@ class App:
 
 	def GetAllConfig(self):
 		for param in self.camconfig.keys():
+			if param not in ["dev_reboot", "restore_factory_settings"]:
+				tosend = '{"msg_id":3,"token":%s,"param":"%s"}' %(self.token, param)
+				self.srv.send(tosend)
+				thisresponse = self.srv.recv(512)
+				if '": "settable:' in thisresponse:
+					settable, thisoptions = re.findall('": "(.+?):(.+)" } ] }', thisresponse)[0]
+					allparams = thisoptions.replace("\\/","/").split("#")
+					self.camsettableconfig[param]=allparams
+
+
+	def GetDetailConfig(self, param):
+		if param not in ["dev_reboot", "restore_factory_settings"]:
 			tosend = '{"msg_id":3,"token":%s,"param":"%s"}' %(self.token, param)
 			self.srv.send(tosend)
 			thisresponse = self.srv.recv(512)
@@ -134,8 +148,11 @@ class App:
 		myconf = conf.split(",")
 		
 		for mytag in myconf:
-			param, value = re.findall(' { "(.+)": "(.+)" }', mytag)[0]
-			self.camconfig[param]=value
+			try:
+				param, value = re.findall(' { "(.+)": "(.+)" }', mytag)[0]
+				self.camconfig[param]=value
+			except:
+				print mytag
 			
 
 	def callback(self):
@@ -178,6 +195,8 @@ class App:
 			self.camconn.destroy() #hide connection selection
 			self.Cameramenu.entryconfig(0, state="normal")
 			self.Cameramenu.entryconfig(1, state="normal")
+			self.Cameramenu.entryconfig(2, state="normal")
+			self.Cameramenu.entryconfig(3, state="normal")
 			self.connected = True
 			self.ReadConfig()
 			self.UpdateUsage()
@@ -257,7 +276,17 @@ class App:
 		self.ReadConfig()
 		self.content = Frame(self.mainwindow)
 		self.controlbuttons = Frame(self.content)
-		self.bphoto = Button(self.controlbuttons, text="Take a \nPHOTO", width=7, command=self.ActionPhoto, bg="#ccccff")
+		if self.camconfig["capture_mode"] == "precise quality":
+			self.bphoto = Button(self.controlbuttons, text="Take a \nPHOTO", width=7, command=self.ActionPhoto, bg="#ccccff")
+		elif self.camconfig["capture_mode"] == "precise quality cont.":
+			if self.camconfig["precise_cont_capturing"] == "off":
+				self.bphoto = Button(self.controlbuttons, text="Start\nTIMELAPSE", width=7, command=self.ActionPhoto, bg="#66ff66")
+			else:
+				self.bphoto = Button(self.controlbuttons, text="Stop\nTIMELAPSE", width=7, command=self.ActionPhoto, bg="#ff6666")
+		elif self.camconfig["capture_mode"] == "burst quality":
+			self.bphoto = Button(self.controlbuttons, text="Burst \nPHOTOS", width=7, command=self.ActionPhoto, bg="#ffccff")
+		elif self.camconfig["capture_mode"] == "precise self quality":
+			self.bphoto = Button(self.controlbuttons, text="Delayed\nPHOTO", width=7, command=self.ActionPhoto, bg="#ccffff")
 		self.bphoto.pack(side=LEFT, padx=10, ipadx=5, pady=5)
 		
 		if "record" in self.camconfig["app_status"]:
@@ -265,6 +294,12 @@ class App:
 		else:
 			self.brecord = Button(self.controlbuttons, text="START\nRecording", width=7, command=self.ActionRecordStart, bg="#66ff66")
 		self.brecord.pack(side=LEFT, padx=10, ipadx=5, pady=5)
+		if self.camconfig["capture_mode"] == "precise quality cont.":
+			if self.camconfig["precise_cont_capturing"] == "on":
+				self.brecord.config(state=DISABLED) 
+				self.brecord.update_idletasks()
+
+
 		if "off" in self.camconfig["preview_status"]:
 			self.bstream = Button(self.controlbuttons, text="LIVE\nView", width=7, state=DISABLED)
 		else:
@@ -286,13 +321,42 @@ class App:
 		if self.ActualAction.startswith("FileManager"):
 			self.FileManager()
 
+	def ActionReboot(self):
+		if tkMessageBox.askyesno("Reboot camera", "Are you sure you want to\nreboot camera?\n\nThis will close C&C"):
+			tosend = '{"msg_id":2,"token":%s, "type":"dev_reboot", "param":"on"}' %self.token
+			self.srv.send(tosend)
+			time.sleep(1)
+			sys.exit()
+
+	def ActionFactory(self):
+		if tkMessageBox.askyesno("Reboot camera", "Are you sure you want to\nRESET CAMERA TO FACTORY SETTINGS?\n\nThis will close C&C"):
+			tosend = '{"msg_id":2,"token":%s, "type":"restore_factory_settings", "param":"on"}' %self.token
+			self.srv.send(tosend)
+			time.sleep(1)
+			sys.exit()
+
 	def ActionPhoto(self):
 		tosend = '{"msg_id":769,"token":%s}' %self.token
+		if self.camconfig["capture_mode"] == "precise quality cont.":
+			if self.camconfig["precise_cont_capturing"] == "on":
+				tosend = '{"msg_id":770,"token":%s}' %self.token
 		self.srv.send(tosend)
-		self.srv.recv(512)
-		self.srv.recv(512)
-		self.srv.recv(512)
+		conf = ""
+		while "param" not in conf:
+			conf = self.srv.recv(6096)
+		self.ReadConfig()
 		self.UpdateUsage()
+		if self.camconfig["capture_mode"] == "precise quality cont.":
+			if self.camconfig["precise_cont_capturing"] == "off":
+				self.bphoto.config(text="Start\nTIMELAPSE", bg="#66ff66")
+				self.brecord.config(state="normal") 
+			else:
+				self.bphoto.config(text="Stop\nTIMELAPSE", bg="#ff6666")
+				self.brecord.config(state=DISABLED) 
+
+			self.brecord.update_idletasks()
+			self.bphoto.update_idletasks()
+
 
 	def ActionRecordStart(self):
 		self.UpdateUsage()
@@ -300,7 +364,7 @@ class App:
 		self.srv.send(tosend)
 		self.srv.recv(512)
 		self.srv.recv(512)
-		self.brecord.config(text="STOP\nrecording", command=self.ActionRecordStop, bg="#ff6666") #display status message in statusbar
+		self.brecord.config(text="STOP\nrecording", command=self.ActionRecordStop, bg="#ff6666") 
 		self.brecord.update_idletasks()
 		self.ReadConfig()
 
@@ -310,7 +374,7 @@ class App:
 		self.srv.recv(512)
 		self.srv.recv(512)
 		self.srv.recv(512)
-		self.brecord.config(text="START\nrecording", command=self.ActionRecordStart, bg="#66ff66") #display status message in statusbar
+		self.brecord.config(text="START\nrecording", command=self.ActionRecordStart, bg="#66ff66")
 		self.brecord.update_idletasks()
 		self.ReadConfig()
 		self.UpdateUsage()
@@ -361,23 +425,18 @@ class App:
 		tosend = '{"msg_id":2,"token":%s, "type":"%s", "param":"%s"}' %(self.token, myoption, myvalue.replace("/","\\/"))
 		self.srv.send(tosend)
 		self.srv.recv(512)
+		if myoption == "video_standard":
+			self.GetDetailConfig("video_resolution")
 		self.ReadConfig()
+
 
 	def MenuConfig_changed(self, *args):
 		myoption = self.config_thisoption.get()
 		
-		config_values = list(self.camsettableconfig[myoption])
-		config_values_check = list(config_values)
+		self.config_values = list(self.camsettableconfig[myoption])
 		self.config_thisvalue.set(self.camconfig[myoption].replace("\\/","/")) # default value
 		if myoption == "video_resolution": #NTSC/PAL resolution check
 			self.config_note.config(text='*video_resolution is limited by selected video_standard', bg="#ffff88")
-			for checkvalue in config_values_check:
-				if self.camconfig["video_standard"] == "NTSC":
-					if "24P" in checkvalue or "48P" in checkvalue:
-						config_values.remove(checkvalue)
-				elif self.camconfig["video_standard"] == "PAL":
-					if "24P" not in checkvalue or "48P" not in checkvalue:
-						config_values.remove(checkvalue)
 		elif myoption == "video_standard":
 			self.config_note.config(text='*video_standard limits video_resolution options', bg="#ffff88")
 		elif myoption == "start_wifi_while_booted":
@@ -386,11 +445,13 @@ class App:
 			self.config_note.config(text='*Turn this on to enable LIVE view', bg="#ffff88")
 		elif myoption == "camera_clock":
 			self.config_note.config(text='*Click Apply to set Camera clock to the same as this PC', bg="#ffff88")
+		elif myoption == "warp_enable":
+			self.config_note.config(text='*On = no fisheye, Off = Fisheye', bg="#ffff88")
 		else:
 			self.config_note.config(text='', bg=self.defaultbg)
 		menu = self.config_valuebox['menu']
 		menu.delete(0, END)
-		for value in config_values:
+		for value in self.config_values:
 			menu.add_command(label=value, command=lambda value=value: self.config_thisvalue.set(value))
 
 	def MenuConfig(self):
@@ -484,7 +545,9 @@ class App:
 			self.MainButtonFiles.config(state="normal")
 			self.FileButtonDownload.config(state="normal")
 			self.FileButtonDelete.config(state="normal")
-			self.Cameramenu.entryconfig(0, state="normal")
+			self.Cameramenu.entryconfig(1, state="normal")
+			self.Cameramenu.entryconfig(2, state="normal")
+			self.Cameramenu.entryconfig(3, state="normal")
 							
 		except Exception:
 			self.FileProgress.config(text="No file selected!", bg="#ffdddd")
@@ -493,7 +556,9 @@ class App:
 			self.MainButtonFiles.config(state="normal")
 			self.FileButtonDownload.config(state="normal")
 			self.FileButtonDelete.config(state="normal")
-			self.Cameramenu.entryconfig(0, state="normal")
+			self.Cameramenu.entryconfig(1, state="normal")
+			self.Cameramenu.entryconfig(2, state="normal")
+			self.Cameramenu.entryconfig(3, state="normal")
 	
 
 	def FileDownload(self, *args):
@@ -502,7 +567,9 @@ class App:
 		self.MainButtonFiles.config(state=DISABLED)
 		self.FileButtonDownload.config(state=DISABLED)
 		self.FileButtonDelete.config(state=DISABLED)
-		self.Cameramenu.entryconfig(0, state=DISABLED)
+		self.Cameramenu.entryconfig(1, state=DISABLED)
+		self.Cameramenu.entryconfig(2, state=DISABLED)
+		self.Cameramenu.entryconfig(3, state=DISABLED)
 		
 		self.thread_FileDown = threading.Thread(target=self.FileDownloadThread)
 #		self.thread_FileDown.setDaemon(True)
