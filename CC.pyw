@@ -3,7 +3,7 @@
 #
 # Res Andy 
 
-AppVersion = "0.3.2"
+AppVersion = "0.3.3"
 
 import base64, os, platform, re, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -20,7 +20,7 @@ class App:
 		self.camsettableconfig = {}
 		self.DonateUrl = "http://sw.deltaflyer.cz/donate.html"
 		self.GitUrl = "https://github.com/deltaflyer4747/Xiaomi_Yi"
-		self.UpdateUrl = "https://raw.githubusercontent.com/deltaflyer4747/Xiaomi_Yi/master/README.md"
+		self.UpdateUrl = "https://raw.githubusercontent.com/deltaflyer4747/Xiaomi_Yi/master/version.txt"
 		self.master = master
 		self.master.geometry("445x250+300+250")
 		self.master.wm_title("Xiaomi Yi C&C by Andy_S | ver %s" %AppVersion)
@@ -535,7 +535,7 @@ class App:
 				os.mkdir("Files",0o777)
 			for FileTP in FilesToProcess:
 				self.FileProgress.config(text="Downloading", bg=self.defaultbg)
-				response = urllib2.urlopen('http://%s:%s/DCIM/100MEDIA/%s' %(self.camaddr, self.camwebport, FileTP))
+				response = urllib2.urlopen('http://%s:%s/DCIM/%s/%s' %(self.camaddr, self.camwebport, self.MediaDir, FileTP))
 				try:
 					self.FileDownChunk(response, report_hook=self.FileDownReport, FileTP=FileTP)
 				except Exception:
@@ -582,7 +582,7 @@ class App:
 			FilesToProcessStr = "\n".join(FilesToProcess)
 
 			if tkMessageBox.askyesno("Delete file", "Are you sure you want to DELETE\n\n%s\n\nThis action can't be undone!" %FilesToProcessStr):
-				tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM\/100MEDIA"}' %self.token #make sure we are still in the correct path
+				tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM\/%s"}' %(self.token, self.MediaDir) #make sure we are still in the correct path
 				self.srv.send(tosend)
 				self.srv.recv(512)
 				for FileTP in FilesToProcess:
@@ -603,14 +603,29 @@ class App:
 		except Exception:
 			pass
 		self.content = Frame(self.mainwindow)
-		tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM\/100MEDIA"}' %self.token #lets seth path in camera
+		tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM"}' %self.token #lets seth initial path in camera
 		self.srv.send(tosend)
 		self.srv.recv(512)
 		tosend = '{"msg_id":1282,"token":%s, "param":" -D -S"}' %self.token
 		self.srv.send(tosend)
+		DirListing = ""
+		while "listing" not in DirListing:
+			DirListing = self.srv.recv(1024)
+		
+		DirListing = DirListing[35:]
+		for CamDir in DirListing.split(","):
+			dirname, dirsize, dirdate = re.findall('{"(.+)/":"(.+) bytes\|(.+)"}',CamDir)[0]
+		self.MediaDir = dirname
+		tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM\/%s"}' %(self.token, self.MediaDir) #lets seth final path in camera
+		self.srv.send(tosend)
+		self.srv.recv(512)
+		
+		tosend = '{"msg_id":1282,"token":%s, "param":" -D -S"}' %self.token
+		self.srv.send(tosend)
+		time.sleep(1)
 		FileListing = ""
 		while "listing" not in FileListing:
-			FileListing = self.srv.recv(16384)
+			FileListing = self.srv.recv(655350)
 
 		if len(FileListing) < 40:
 			self.LabelNoFiles = Label(self.content, width=30, pady=10, text="No files found", bg="#ffcccc")
