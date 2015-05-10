@@ -3,7 +3,7 @@
 #
 # Res Andy 
 
-AppVersion = "0.3.3"
+AppVersion = "0.3.4"
 
 import base64, os, platform, re, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -609,25 +609,27 @@ class App:
 		tosend = '{"msg_id":1282,"token":%s, "param":" -D -S"}' %self.token
 		self.srv.send(tosend)
 		DirListing = ""
+		FileListing = ""
 		while "listing" not in DirListing:
 			DirListing = self.srv.recv(1024)
 		
-		DirListing = DirListing[35:]
-		for CamDir in DirListing.split(","):
-			dirname, dirsize, dirdate = re.findall('{"(.+)/":"(.+) bytes\|(.+)"}',CamDir)[0]
-		self.MediaDir = dirname
-		tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM\/%s"}' %(self.token, self.MediaDir) #lets seth final path in camera
-		self.srv.send(tosend)
-		self.srv.recv(512)
+		if len(DirListing) > 40:
+			DirListing = DirListing[35:]
+			for CamDir in DirListing.split(","):
+				dirname, dirsize, dirdate = re.findall('{"(.+)/":"(.+) bytes\|(.+)"}',CamDir)[0]
+			self.MediaDir = dirname
+			tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM\/%s"}' %(self.token, self.MediaDir) #lets seth final path in camera
+			self.srv.send(tosend)
+			self.srv.recv(512)
 		
-		tosend = '{"msg_id":1282,"token":%s, "param":" -D -S"}' %self.token
-		self.srv.send(tosend)
-		time.sleep(1)
-		FileListing = ""
-		while "listing" not in FileListing:
-			FileListing = self.srv.recv(655350)
+			tosend = '{"msg_id":1282,"token":%s, "param":" -D -S"}' %self.token
+			self.srv.send(tosend)
+			time.sleep(1)
+			FileListing = ""
+			while "listing" not in FileListing:
+				FileListing = self.srv.recv(655350)
 
-		if len(FileListing) < 40:
+		if len(FileListing) < 40 :
 			self.LabelNoFiles = Label(self.content, width=30, pady=10, text="No files found", bg="#ffcccc")
 			self.LabelNoFiles.pack(side=TOP,fill=X)
 		else:
