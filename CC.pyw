@@ -1,9 +1,9 @@
 #! /usr/bin/env python
-# encoding: windows-1250
+#Â encoding: utf-8
 #
-# Res Andy 
+# Res andy
 
-AppVersion = "0.3.5"
+AppVersion = "0.3.6"
 
 import base64, os, platform, re, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -21,7 +21,7 @@ class App:
 		self.DonateUrl = "http://sw.deltaflyer.cz/donate.html"
 		self.GitUrl = "https://github.com/deltaflyer4747/Xiaomi_Yi"
 		self.UpdateUrl = "https://raw.githubusercontent.com/deltaflyer4747/Xiaomi_Yi/master/version.txt"
-		self.ConfigInfo = {"auto_low_light":"Automaticaly increase exposure time in low-light conditions", "auto_power_off":"Power down camera after specified time of inactivity", "burst_capture_number":"Specify ammount of images taken in Burst mode", "buzzer_ring":"Enable/disable camera beep", "buzzer_volume":"Volume of camera beep", "camera_clock":"Click Apply to set Camera clock to the same as this PC", "capture_default_mode":"Mode to enter when changing to Capture via system_default_mode", "capture_mode":"Changes behavior of \"Photo\" button", "led_mode":"Set preferred LED behavior", "loop_record":"Overwrites oldest files when memory card is full", "meter mode":"Metering mode for exposure/white ballance", "osd_enable":"Overlay info to hdmi/TV out", "photo_quality":"Set quality of still images", "photo_size":"Set resolution of still images", "photo_stamp":"Overlay date and time of capture to still images", "precise_cont_time":"Delay between individual images in timelapse mode", "precise_selftime":"Set delay to capture in Timer mode", "preview_status":"Turn this on to enable LIVE view", "start_wifi_while_booted":"Enable WiFi on boot", "system_default_mode":"Mode for HW trigger to set when camera is turned on", "system_mode":"Current mode for HW trigger", "video_output_dev_type":"Select video out HDMI or AV out over USB, use same cable as SJ4000", "video_quality":"Set quality of video recordings", "video_rotate":"Rotate video by 180� (upsidedown mount)", "video_resolution":"video_resolution is limited by selected video_standard", "video_stamp":"Overlay date and time to video recordings", "video_standard":"video_standard limits possible video_resolution options", "warp_enable":"On = No fisheye (Compensation ON), Off = Fisheye (Compensation OFF)"}
+		self.ConfigInfo = {"auto_low_light":"Automaticaly increase exposure time in low-light conditions", "auto_power_off":"Power down camera after specified time of inactivity", "burst_capture_number":"Specify ammount of images taken in Burst mode", "buzzer_ring":"Enable/disable camera locator beacon", "buzzer_volume":"Volume of camera beep", "camera_clock":"Click Apply to set Camera clock to the same as this PC", "capture_default_mode":"Mode to enter when changing to Capture via system_default_mode/HW button", "capture_mode":"Changes behavior of \"Photo\" button", "led_mode":"Set preferred LED behavior", "loop_record":"Overwrites oldest files when memory card is full", "meter mode":"Metering mode for exposure/white ballance", "osd_enable":"Overlay info to hdmi/TV out", "photo_quality":"Set quality of still images", "photo_size":"Set resolution of still images", "photo_stamp":"Overlay date and time of capture to still images", "precise_cont_time":"Delay between individual images in timelapse mode", "precise_selftime":"Set delay to capture in Timer mode", "preview_status":"Turn this on to enable LIVE view", "start_wifi_while_booted":"Enable WiFi on boot", "system_default_mode":"Mode for HW trigger to set when camera is turned on", "system_mode":"Current mode for HW trigger", "video_output_dev_type":"Select video out HDMI or AV out over USB, use same cable as SJ4000", "video_quality":"Set quality of video recordings", "video_rotate":"Rotate video by 180° (upsidedown mount)", "video_resolution":"video_resolution is limited by selected video_standard", "video_stamp":"Overlay date and time to video recordings", "video_standard":"video_standard limits possible video_resolution options", "warp_enable":"On = No fisheye (Compensation ON), Off = Fisheye (Compensation OFF)"}
 		self.master = master
 		self.master.geometry("445x250+300+250")
 		self.master.wm_title("Xiaomi Yi C&C by Andy_S | ver %s" %AppVersion)
@@ -117,7 +117,7 @@ class App:
 
 	def GetAllConfig(self):
 		for param in self.camconfig.keys():
-			if param not in ["dev_reboot", "restore_factory_settings"]:
+			if param not in ["dev_reboot", "restore_factory_settings", "capture_mode"]:
 				tosend = '{"msg_id":3,"token":%s,"param":"%s"}' %(self.token, param)
 				self.srv.send(tosend)
 				thisresponse = self.srv.recv(512)
@@ -270,28 +270,31 @@ class App:
 		self.MenuControl()
 	
 	def MenuControl(self):
+		self.ReadConfig()
 		try:
 			self.content.destroy()
 		except Exception:
 			pass
-		self.ReadConfig()
 		self.content = Frame(self.mainwindow)
 		self.controlbuttons = Frame(self.content)
 		if self.camconfig["capture_mode"] == "precise quality":
-			self.bphoto = Button(self.controlbuttons, text="Take a \nPHOTO", width=7, command=self.ActionPhoto, bg="#ccccff")
+			self.bphoto = Button(self.controlbuttons, text="Take a \nPHOTO", width=13, command=self.ActionPhoto, bg="#ccccff")
 		elif self.camconfig["capture_mode"] == "precise quality cont.":
 			if self.camconfig["precise_cont_capturing"] == "off":
-				self.bphoto = Button(self.controlbuttons, text="Start\nTIMELAPSE", width=7, command=self.ActionPhoto, bg="#66ff66")
+				self.bphoto = Button(self.controlbuttons, text="Start\nTIMELAPSE", width=13, command=self.ActionPhoto, bg="#66ff66")
 			else:
-				self.bphoto = Button(self.controlbuttons, text="Stop\nTIMELAPSE", width=7, command=self.ActionPhoto, bg="#ff6666")
+				self.bphoto = Button(self.controlbuttons, text="Stop\nTIMELAPSE", width=13, command=self.ActionPhoto, bg="#ff6666")
 		elif self.camconfig["capture_mode"] == "burst quality":
-			self.bphoto = Button(self.controlbuttons, text="Burst \nPHOTOS", width=7, command=self.ActionPhoto, bg="#ffccff")
+			self.bphoto = Button(self.controlbuttons, text="Burst \nPHOTOS", width=13, command=self.ActionPhoto, bg="#ffccff")
 		elif self.camconfig["capture_mode"] == "precise self quality":
-			self.bphoto = Button(self.controlbuttons, text="Delayed\nPHOTO", width=7, command=self.ActionPhoto, bg="#ccffff")
-		self.bphoto.pack(side=LEFT, padx=10, ipadx=5, pady=5)
+			self.bphoto = Button(self.controlbuttons, text="Delayed\nPHOTO", width=13, command=self.ActionPhoto, bg="#ccffff")
+		self.bphoto.pack(side=LEFT, padx=12, pady=5)
 		
+	
 		if "record" in self.camconfig["app_status"]:
 			self.brecord = Button(self.controlbuttons, text="STOP\nRecording", width=7, command=self.ActionRecordStop, bg="#ff6666")
+			self.bphoto.config(state=DISABLED)
+			self.bphoto.update_idletasks() 
 		else:
 			self.brecord = Button(self.controlbuttons, text="START\nRecording", width=7, command=self.ActionRecordStart, bg="#66ff66")
 		self.brecord.pack(side=LEFT, padx=10, ipadx=5, pady=5)
@@ -301,13 +304,34 @@ class App:
 				self.brecord.update_idletasks()
 
 
-		if "off" in self.camconfig["preview_status"]:
-			self.bstream = Button(self.controlbuttons, text="LIVE\nView", width=7, state=DISABLED)
+		if "off" in self.camconfig["preview_status"] or "record" in self.camconfig["app_status"]:
+			self.bstream = Button(self.controlbuttons, text="LIVE\nView", width=7, command=self.ActionVideoStart, bg="#ffff66", state=DISABLED)
 		else:
 			self.bstream = Button(self.controlbuttons, text="LIVE\nView", width=7, command=self.ActionVideoStart, bg="#ffff66")
 		self.bstream.pack(side=LEFT, padx=10, ipadx=5, pady=5)
 		self.controlbuttons.pack(side=TOP, fill=X)
+
+		self.FramePhotoButtonMod = Frame(self.content)
+		self.Photo_options = {"precise quality":"Single","precise quality cont.":"Timelapse","burst quality":"Burst","precise self quality":"Delayed"}
+		self.Photo_thisvalue = StringVar(self.FramePhotoButtonMod)
+		self.Photo_thisvalue.set(self.Photo_options[self.camconfig["capture_mode"]]) # actual value
+		self.Photo_thisvalue.trace("w", self.MenuPhoto_changed)
+		self.Photo_valuebox = OptionMenu(self.FramePhotoButtonMod, self.Photo_thisvalue, *self.Photo_options.values())
+		self.Photo_valuebox.config(width=10)
+		self.Photo_valuebox.pack(side=LEFT, padx=10)
+		self.FramePhotoButtonMod.pack(side=TOP, fill=X)
+
+
 		self.content.pack(side=TOP, fill=X)
+	
+	def MenuPhoto_changed(self, *args):
+		myoption = self.Photo_options.keys()[self.Photo_options.values().index(self.Photo_thisvalue.get())]
+		tosend = '{"msg_id":2,"token":%s, "type":"capture_mode", "param":"%s"}' %(self.token, myoption)
+		self.srv.send(tosend)
+		self.srv.recv(512)
+		self.MenuControl()
+
+		
 	
 	def ActionInfo(self):
 		tkMessageBox.showinfo("Camera information", "SW ver: %s\nHW ver: %s\nSN: %s" %(self.camconfig["sw_version"], self.camconfig["hw_version"], self.camconfig["serial_number"]))
@@ -365,8 +389,10 @@ class App:
 		self.srv.send(tosend)
 		self.srv.recv(512)
 		self.srv.recv(512)
-		self.brecord.config(text="STOP\nrecording", command=self.ActionRecordStop, bg="#ff6666") 
+		self.brecord.config(text="STOP\nrecording", command=self.ActionRecordStop, bg="#ff6666")
 		self.brecord.update_idletasks()
+		self.bphoto.config(state=DISABLED)
+		self.bphoto.update_idletasks() 
 		self.ReadConfig()
 
 	def ActionRecordStop(self):
@@ -377,14 +403,17 @@ class App:
 		self.srv.recv(512)
 		self.brecord.config(text="START\nrecording", command=self.ActionRecordStart, bg="#66ff66")
 		self.brecord.update_idletasks()
+		self.bphoto.config(state="normal")
+		self.bphoto.update_idletasks() 
 		self.ReadConfig()
 		self.UpdateUsage()
 	
 	def ActionVideoStart(self):
 		tosend = '{"msg_id":259,"token":%s,"param":"none_force"}' %self.token
 		self.srv.send(tosend)
-		self.srv.recv(512)
-		self.srv.recv(512)
+		resp = ""
+		while '"msg_id":259' not in resp:
+			resp = self.srv.recv(512)
 		try:
 			if self.custom_vlc_path != ".":
 				if os.path.isfile(self.custom_vlc_path):
@@ -455,8 +484,8 @@ class App:
 		self.content = Frame(self.mainwindow)
 
 		self.controlnote = Frame(self.content, height=20)
-		self.config_note = Label(self.controlnote, width=55, text="", anchor=W)
-		self.config_note.pack(side=LEFT, fill=X, padx=10)
+		self.config_note = Label(self.controlnote, width=63, text="", anchor=W)
+		self.config_note.pack(side=LEFT, fill=X, padx=5)
 		self.controlnote.pack(side=TOP, fill=X)
 		
 		self.controlselect = Frame(self.content)
