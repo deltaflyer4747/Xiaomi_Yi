@@ -3,7 +3,7 @@
 #
 # Res Andy 
 
-AppVersion = "0.3.4"
+AppVersion = "0.3.5"
 
 import base64, os, platform, re, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -21,6 +21,7 @@ class App:
 		self.DonateUrl = "http://sw.deltaflyer.cz/donate.html"
 		self.GitUrl = "https://github.com/deltaflyer4747/Xiaomi_Yi"
 		self.UpdateUrl = "https://raw.githubusercontent.com/deltaflyer4747/Xiaomi_Yi/master/version.txt"
+		self.ConfigInfo = {"auto_low_light":"Automaticaly increase exposure time in low-light conditions", "auto_power_off":"Power down camera after specified time of inactivity", "burst_capture_number":"Specify ammount of images taken in Burst mode", "buzzer_ring":"Enable/disable camera beep", "buzzer_volume":"Volume of camera beep", "camera_clock":"Click Apply to set Camera clock to the same as this PC", "capture_default_mode":"Mode to enter when changing to Capture via system_default_mode", "capture_mode":"Changes behavior of \"Photo\" button", "led_mode":"Set preferred LED behavior", "loop_record":"Overwrites oldest files when memory card is full", "meter mode":"Metering mode for exposure/white ballance", "osd_enable":"Overlay info to hdmi/TV out", "photo_quality":"Set quality of still images", "photo_size":"Set resolution of still images", "photo_stamp":"Overlay date and time of capture to still images", "precise_cont_time":"Delay between individual images in timelapse mode", "precise_selftime":"Set delay to capture in Timer mode", "preview_status":"Turn this on to enable LIVE view", "start_wifi_while_booted":"Enable WiFi on boot", "system_default_mode":"Mode for HW trigger to set when camera is turned on", "system_mode":"Current mode for HW trigger", "video_output_dev_type":"Select video out HDMI or AV out over USB, use same cable as SJ4000", "video_quality":"Set quality of video recordings", "video_rotate":"Rotate video by 180° (upsidedown mount)", "video_resolution":"video_resolution is limited by selected video_standard", "video_stamp":"Overlay date and time to video recordings", "video_standard":"video_standard limits possible video_resolution options", "warp_enable":"On = No fisheye (Compensation ON), Off = Fisheye (Compensation OFF)"}
 		self.master = master
 		self.master.geometry("445x250+300+250")
 		self.master.wm_title("Xiaomi Yi C&C by Andy_S | ver %s" %AppVersion)
@@ -435,20 +436,10 @@ class App:
 		
 		self.config_values = list(self.camsettableconfig[myoption])
 		self.config_thisvalue.set(self.camconfig[myoption].replace("\\/","/")) # default value
-		if myoption == "video_resolution": #NTSC/PAL resolution check
-			self.config_note.config(text='*video_resolution is limited by selected video_standard', bg="#ffff88")
-		elif myoption == "video_standard":
-			self.config_note.config(text='*video_standard limits video_resolution options', bg="#ffff88")
-		elif myoption == "start_wifi_while_booted":
-			self.config_note.config(text='*This affects connection by this program', bg="#ffff88")
-		elif myoption == "preview_status":
-			self.config_note.config(text='*Turn this on to enable LIVE view', bg="#ffff88")
-		elif myoption == "camera_clock":
-			self.config_note.config(text='*Click Apply to set Camera clock to the same as this PC', bg="#ffff88")
-		elif myoption == "warp_enable":
-			self.config_note.config(text='*On = no fisheye, Off = Fisheye', bg="#ffff88")
-		else:
-			self.config_note.config(text='', bg=self.defaultbg)
+		try:
+			self.config_note.config(text='*%s' %self.ConfigInfo[myoption], bg="#ffff88")
+		except Exception:
+			self.config_note.config(text='* Unknown config option, if you know what it does, let me know.', bg=self.defaultbg)
 		menu = self.config_valuebox['menu']
 		menu.delete(0, END)
 		for value in self.config_values:
