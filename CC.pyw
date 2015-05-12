@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.4.1"
+AppVersion = "0.4.2"
 
 import base64, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -631,6 +631,7 @@ class App:
 	
 	def FileManager(self, FileProgressStr="Select a file"):
 		self.ActualAction = "FileManager"
+		FileListing = {}
 		try:
 			self.content.destroy()
 		except Exception:
@@ -646,7 +647,6 @@ class App:
 			self.Comm(tosend)
 		
 			tosend = '{"msg_id":1282,"token":%s, "param":" -D -S"}' %self.token
-			FileListing = {}
 			for each in self.Comm(tosend)["listing"]: FileListing.update(each)
 
 		if len(FileListing) == 0 :
