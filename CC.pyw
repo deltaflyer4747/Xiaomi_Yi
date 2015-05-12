@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.4.2"
+AppVersion = "0.4.3"
 
 import base64, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -118,18 +118,19 @@ class App:
 
 	def GetAllConfig(self):
 		for param in self.camconfig.keys():
-			if param not in ["dev_reboot", "restore_factory_settings", "capture_mode"]:
+			if param not in ["dev_reboot", "restore_factory_settings", "capture_mode", "wifi_ssid", "wifi_password"]:
 				tosend = '{"msg_id":3,"token":%s,"param":"%s"}' %(self.token, param)
 				resp = self.Comm(tosend)
 				thisresponse = resp["param"][0].values()[0]
 				if thisresponse.startswith('settable:'):
+					print param
 					thisoptions = re.findall('settable:(.+)', thisresponse)[0]
 					allparams = thisoptions.replace("\\/","/").split("#")
 					self.camsettableconfig[param]=allparams
 
 
 	def GetDetailConfig(self, param):
-		if param not in ["dev_reboot", "restore_factory_settings"]:
+		if param not in ["dev_reboot", "restore_factory_settings", "wifi_ssid", "wifi_password"]:
 			tosend = '{"msg_id":3,"token":%s,"param":"%s"}' %(self.token, param)
 			resp = self.Comm(tosend)
 			thisresponse = resp["param"][0].values()[0]
@@ -154,79 +155,82 @@ class App:
 		tkMessageBox.showinfo("About", "Control&Configure | ver. %s\nCreated by Andy_S, 2015\n\nandys@deltaflyer.cz" %AppVersion)
 	
 	def CamConnect(self):
-#		try:
-		self.camaddr = self.addrv1.get() #read IP address from inputbox
-		self.camport = int(self.addrv2.get()) #read port from inputbox & convert to integer
-		self.camwebport = int(self.addrv3.get()) #read port from inputbox & convert to integer
-		socket.setdefaulttimeout(5)
-		self.srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create socket
-		self.srv.connect((self.camaddr, self.camport)) #open socket
-		self.srv.setblocking(0)
-		self.connected = True
-		socket.setdefaulttimeout(None)
-		self.thread_read = threading.Thread(target=self.JsonReader)
-		self.thread_read.setDaemon(True)
-		self.thread_read.setName('JsonReader')
-		self.thread_read.start()
-		self.token = ""
-		self.Comm('{"msg_id":257,"token":0}') #auth to the camera
-		tokentime = time.time()
-		while self.token == "":
-			if time.time()+5>tokentime:
-				continue
-			else:
-				raise Exception('Connection', 'failed') #throw an exception
-		filet = open("settings.cfg","w")
-		filet.write('camaddr = %s\r\n' %self.camaddr) 
-		filet.write('camport = %s\r\n' %self.camport)
-		filet.write('camwebport = %s\r\n' %self.camwebport)
-		filet.write('custom_vlc_path = %s\r\n' %self.custom_vlc_path)
-		filet.close()
-		self.status.config(text="Connected") #display status message in statusbar
-		self.status.update_idletasks()
-		self.camconn.destroy() #hide connection selection
-		self.Cameramenu.entryconfig(0, state="normal")
-		self.Cameramenu.entryconfig(1, state="normal")
-		self.Cameramenu.entryconfig(2, state="normal")
-		self.Cameramenu.entryconfig(3, state="normal")
-
-
-		self.ReadConfig()
-		self.UpdateUsage()
-		self.UpdateBattery()
-		self.MainWindow()
-#		except Exception:
-#			tkMessageBox.showerror("Connect", "Cannot connect to the address specified")
-#			self.srv.close()
+		try:
+			self.camaddr = self.addrv1.get() #read IP address from inputbox
+			self.camport = int(self.addrv2.get()) #read port from inputbox & convert to integer
+			self.camwebport = int(self.addrv3.get()) #read port from inputbox & convert to integer
+			socket.setdefaulttimeout(5)
+			self.srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create socket
+			self.srv.connect((self.camaddr, self.camport)) #open socket
+			self.srv.setblocking(0)
+			self.connected = True
+			self.thread_read = threading.Thread(target=self.JsonReader)
+			self.thread_read.setDaemon(True)
+			self.thread_read.setName('JsonReader')
+			self.thread_read.start()
+			self.token = ""
+			tokentime = time.time()
+			self.srv.send('{"msg_id":257,"token":0}') #auth to the camera
+			while self.token == "":
+				if time.time()+5>tokentime:
+					continue
+				else:
+					raise Exception('Connection', 'failed') #throw an exception
+			filet = open("settings.cfg","w")
+			filet.write('camaddr = %s\r\n' %self.camaddr) 
+			filet.write('camport = %s\r\n' %self.camport)
+			filet.write('camwebport = %s\r\n' %self.camwebport)
+			filet.write('custom_vlc_path = %s\r\n' %self.custom_vlc_path)
+			filet.close()
+			self.status.config(text="Connected") #display status message in statusbar
+			self.status.update_idletasks()
+			self.camconn.destroy() #hide connection selection
+			self.Cameramenu.entryconfig(0, state="normal")
+			self.Cameramenu.entryconfig(1, state="normal")
+			self.Cameramenu.entryconfig(2, state="normal")
+			self.Cameramenu.entryconfig(3, state="normal")
+	
+	
+			self.ReadConfig()
+			self.UpdateUsage()
+			self.UpdateBattery()
+			self.MainWindow()
+		except Exception:
+			self.connected = False
+			tkMessageBox.showerror("Connect", "Cannot connect to the address specified")
+			self.srv.close()
 	
 	def JsonReader(self):
 		data = ""
 		counter = 0
 		flip = 0
 		while self.connected:
-			ready = select.select([self.srv], [], [])
-			if ready[0]:
-				byte = self.srv.recv(1)
-				if byte == "{":
-					counter += 1
-					flip = 1
-				elif byte == "}":
-					counter -= 1
-				data += byte
-				
-				if flip == 1 and counter == 0:
-					try:
-						data_dec = json.loads(data)
-						data = ""
-						flip = 0
-						if "msg_id" in data_dec.keys():
-							if data_dec["msg_id"] == 257:
-								self.token = data_dec["param"]
-							self.JsonData[data_dec["msg_id"]] = data_dec
-						else:
-							raise Exception('Unknown','data')
-					except Exception:
-						print data
+			try:
+				ready = select.select([self.srv], [], [])
+				if ready[0]:
+					byte = self.srv.recv(1)
+					if byte == "{":
+						counter += 1
+						flip = 1
+					elif byte == "}":
+						counter -= 1
+					data += byte
+					
+					if flip == 1 and counter == 0:
+						try:
+							data_dec = json.loads(data)
+							data = ""
+							flip = 0
+							if "msg_id" in data_dec.keys():
+								if data_dec["msg_id"] == 257:
+									self.token = data_dec["param"]
+								self.JsonData[data_dec["msg_id"]] = data_dec
+							else:
+								raise Exception('Unknown','data')
+						except Exception:
+							print data
+			except Exception:
+				self.connected = False
 
 	def Comm(self, tosend):
 		Jtosend = json.loads(tosend)
