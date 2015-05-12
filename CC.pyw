@@ -3,21 +3,22 @@
 #
 # Res andy
 
-AppVersion = "0.3.6"
+AppVersion = "0.4.1"
 
-import base64, os, platform, re, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
+import base64, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
 from operator import itemgetter
 
 class App:
 
 	def __init__(self, master):
-		self.token = ""
 		self.connected = False
 		self.camconfig = {}
 		self.ActualAction = ""
 		self.defaultbg = master.cget('bg')
 		self.camsettableconfig = {}
+		self.JsonData = {}
+		
 		self.DonateUrl = "http://sw.deltaflyer.cz/donate.html"
 		self.GitUrl = "https://github.com/deltaflyer4747/Xiaomi_Yi"
 		self.UpdateUrl = "https://raw.githubusercontent.com/deltaflyer4747/Xiaomi_Yi/master/version.txt"
@@ -30,7 +31,7 @@ class App:
 		self.statusBlock.pack(side=BOTTOM, fill=X)
 		self.status = Label(self.statusBlock, width=28, text="Disconnected", anchor=W)
 		self.status.grid(column=0, row=0)
-		self.battery = Label(self.statusBlock, width=12, text="", anchor=W)
+		self.battery = Label(self.statusBlock, width=13, text="", anchor=W)
 		self.battery.grid(column=1, row=0)
 		self.usage = Label(self.statusBlock, width=20, text="", anchor=E)
 		self.usage.grid(column=2, row=0)
@@ -119,10 +120,10 @@ class App:
 		for param in self.camconfig.keys():
 			if param not in ["dev_reboot", "restore_factory_settings", "capture_mode"]:
 				tosend = '{"msg_id":3,"token":%s,"param":"%s"}' %(self.token, param)
-				self.srv.send(tosend)
-				thisresponse = self.srv.recv(512)
-				if '": "settable:' in thisresponse:
-					settable, thisoptions = re.findall('": "(.+?):(.+)" } ] }', thisresponse)[0]
+				resp = self.Comm(tosend)
+				thisresponse = resp["param"][0].values()[0]
+				if thisresponse.startswith('settable:'):
+					thisoptions = re.findall('settable:(.+)', thisresponse)[0]
 					allparams = thisoptions.replace("\\/","/").split("#")
 					self.camsettableconfig[param]=allparams
 
@@ -130,34 +131,20 @@ class App:
 	def GetDetailConfig(self, param):
 		if param not in ["dev_reboot", "restore_factory_settings"]:
 			tosend = '{"msg_id":3,"token":%s,"param":"%s"}' %(self.token, param)
-			self.srv.send(tosend)
-			thisresponse = self.srv.recv(512)
-			if '": "settable:' in thisresponse:
-				settable, thisoptions = re.findall('": "(.+?):(.+)" } ] }', thisresponse)[0]
+			resp = self.Comm(tosend)
+			thisresponse = resp["param"][0].values()[0]
+			if thisresponse.startswith('settable:'):
+				thisoptions = re.findall('settable:(.+)', thisresponse)[0]
 				allparams = thisoptions.replace("\\/","/").split("#")
 				self.camsettableconfig[param]=allparams
 
 
 	def ReadConfig(self):
 		tosend = '{"msg_id":3,"token":%s}' %self.token 
-		self.srv.send(tosend)
-		time.sleep(1)
-		conf = ""
-		while "param" not in conf:
-			conf = self.srv.recv(6096)
-		conf = conf[36:]
-		myconf = conf.split(",")
-		
-		for mytag in myconf:
-			try:
-				param, value = re.findall(' { "(.+)": "(.+)" }', mytag)[0]
-				self.camconfig[param]=value
-			except:
-				print mytag
+		resp = self.Comm(tosend)
+		self.camconfig = {}
+		for each in resp["param"]: self.camconfig.update(each)
 			
-
-	def callback(self):
-		print "called the callback!"
 	
 	def quit(self):
 		sys.exit()
@@ -167,60 +154,102 @@ class App:
 		tkMessageBox.showinfo("About", "Control&Configure | ver. %s\nCreated by Andy_S, 2015\n\nandys@deltaflyer.cz" %AppVersion)
 	
 	def CamConnect(self):
-		try:
-			self.camaddr = self.addrv1.get() #read IP address from inputbox
-			self.camport = int(self.addrv2.get()) #read port from inputbox & convert to integer
-			self.camwebport = int(self.addrv3.get()) #read port from inputbox & convert to integer
-			socket.setdefaulttimeout(5)
-			self.srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create socket
-			self.srv.connect((self.camaddr, self.camport)) #open socket
-			self.srv.send('{"msg_id":257,"token":0}') #auth to the camera
-			data = self.srv.recv(512) #and get a token
-			if "rval" in data:
-				self.token = re.findall('"param": (.+) }',data)[0]	
+#		try:
+		self.camaddr = self.addrv1.get() #read IP address from inputbox
+		self.camport = int(self.addrv2.get()) #read port from inputbox & convert to integer
+		self.camwebport = int(self.addrv3.get()) #read port from inputbox & convert to integer
+		socket.setdefaulttimeout(5)
+		self.srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create socket
+		self.srv.connect((self.camaddr, self.camport)) #open socket
+		self.srv.setblocking(0)
+		self.connected = True
+		socket.setdefaulttimeout(None)
+		self.thread_read = threading.Thread(target=self.JsonReader)
+		self.thread_read.setDaemon(True)
+		self.thread_read.setName('JsonReader')
+		self.thread_read.start()
+		self.token = ""
+		self.Comm('{"msg_id":257,"token":0}') #auth to the camera
+		tokentime = time.time()
+		while self.token == "":
+			if time.time()+5>tokentime:
+				continue
 			else:
-				data = self.srv.recv(512)
-				if "rval" in data:
-					self.token = re.findall('"param": (.+) }',data)[0]
-			if self.token == "": #if we didn't receive a token (we are connecting elsewhere?)
-				raise Exception('Connection', 'failed') #throw an exception	
+				raise Exception('Connection', 'failed') #throw an exception
+		filet = open("settings.cfg","w")
+		filet.write('camaddr = %s\r\n' %self.camaddr) 
+		filet.write('camport = %s\r\n' %self.camport)
+		filet.write('camwebport = %s\r\n' %self.camwebport)
+		filet.write('custom_vlc_path = %s\r\n' %self.custom_vlc_path)
+		filet.close()
+		self.status.config(text="Connected") #display status message in statusbar
+		self.status.update_idletasks()
+		self.camconn.destroy() #hide connection selection
+		self.Cameramenu.entryconfig(0, state="normal")
+		self.Cameramenu.entryconfig(1, state="normal")
+		self.Cameramenu.entryconfig(2, state="normal")
+		self.Cameramenu.entryconfig(3, state="normal")
+
+
+		self.ReadConfig()
+		self.UpdateUsage()
+		self.UpdateBattery()
+		self.MainWindow()
+#		except Exception:
+#			tkMessageBox.showerror("Connect", "Cannot connect to the address specified")
+#			self.srv.close()
 	
-			filet = open("settings.cfg","w")
-			filet.write('camaddr = %s\r\n' %self.camaddr) 
-			filet.write('camport = %s\r\n' %self.camport)
-			filet.write('camwebport = %s\r\n' %self.camwebport)
-			filet.write('custom_vlc_path = %s\r\n' %self.custom_vlc_path)
-			filet.close()
-			self.status.config(text="Connected") #display status message in statusbar
-			self.status.update_idletasks()
-			self.camconn.destroy() #hide connection selection
-			self.Cameramenu.entryconfig(0, state="normal")
-			self.Cameramenu.entryconfig(1, state="normal")
-			self.Cameramenu.entryconfig(2, state="normal")
-			self.Cameramenu.entryconfig(3, state="normal")
-			self.connected = True
-			self.ReadConfig()
-			self.UpdateUsage()
-			self.UpdateBattery()
-			self.MainWindow()
-		except Exception:
-			tkMessageBox.showerror("Connect", "Cannot connect to the address specified")
-			self.srv.close()
-	
+	def JsonReader(self):
+		data = ""
+		counter = 0
+		flip = 0
+		while self.connected:
+			ready = select.select([self.srv], [], [])
+			if ready[0]:
+				byte = self.srv.recv(1)
+				if byte == "{":
+					counter += 1
+					flip = 1
+				elif byte == "}":
+					counter -= 1
+				data += byte
+				
+				if flip == 1 and counter == 0:
+					try:
+						data_dec = json.loads(data)
+						data = ""
+						flip = 0
+						if "msg_id" in data_dec.keys():
+							if data_dec["msg_id"] == 257:
+								self.token = data_dec["param"]
+							self.JsonData[data_dec["msg_id"]] = data_dec
+						else:
+							raise Exception('Unknown','data')
+					except Exception:
+						print data
+
+	def Comm(self, tosend):
+		Jtosend = json.loads(tosend)
+		msgid = Jtosend["msg_id"]
+		self.JsonData[msgid] = ""
+		self.srv.send(tosend)
+		while self.JsonData[msgid]=="":continue
+		if self.JsonData[msgid]["rval"] == -4: #wrong token, ackquire new one & resend - "workaround" for camera insisting on tokens
+			self.token = ""
+			self.srv.send('{"msg_id":257,"token":0}')
+			while self.token=="":continue
+			Jtosend["token"] = self.token
+			tosend = json.dumps(Jtosend)
+			self.JsonData[msgid] = ""
+			self.srv.send(tosend)
+			while self.JsonData[msgid]=="":continue
+		return self.JsonData[msgid]
 
 	def UpdateUsage(self):
 		tosend = '{"msg_id":5,"token":%s,"type":"total"}' %self.token
-		self.srv.send(tosend)
-		data = ""
-		while ("param" not in data and '"msg_id": 5' not in data):
-			data = self.srv.recv(512)
-		totalspace = int(re.findall('"param": (.+) }', data)[0])
+		totalspace = self.Comm(tosend)["param"]
 		tosend = '{"msg_id":5,"token":%s,"type":"free"}' %self.token
-		self.srv.send(tosend)
-		data = ""
-		while ("param" not in data and '"msg_id": 5' not in data):
-			data = self.srv.recv(512)
-		freespace = float(re.findall('"param": (.+) }', data)[0])
+		freespace = float(self.Comm(tosend)["param"])
 		usedspace = totalspace-freespace
 		totalpre = 0
 		usedpre = 0
@@ -243,11 +272,10 @@ class App:
 	
 	def UpdateBattery(self):
 		tosend = '{"msg_id":13,"token":%s}' %self.token
-		self.srv.send(tosend)
-		data = ""
-		while ("param" not in data and '"msg_id":13' not in data):
-			data = self.srv.recv(512)
-		Ctype, charge = re.findall('"type":"(.+)","param":"(.+)"}', data)[0]
+		resp = self.Comm(tosend)
+		Ctype = resp["type"]
+		charge = resp["param"]
+
 		if Ctype == "adapter":
 			Ctype = "Charging"
 		else:
@@ -327,8 +355,7 @@ class App:
 	def MenuPhoto_changed(self, *args):
 		myoption = self.Photo_options.keys()[self.Photo_options.values().index(self.Photo_thisvalue.get())]
 		tosend = '{"msg_id":2,"token":%s, "type":"capture_mode", "param":"%s"}' %(self.token, myoption)
-		self.srv.send(tosend)
-		self.srv.recv(512)
+		self.Comm(tosend)
 		self.MenuControl()
 
 		
@@ -340,8 +367,7 @@ class App:
 	def ActionFormat(self):
 		if tkMessageBox.askyesno("Format memory card", "Are you sure you want to\nFORMAT MEMORY CARD?\n\nThis action can't be undone\nALL PHOTOS & VIDEOS WILL BE LOST!"):
 			tosend = '{"msg_id":4,"token":%s}' %self.token
-			self.srv.send(tosend)
-			self.srv.recv(512)
+			self.Comm(tosend)
 		self.UpdateUsage()
 		if self.ActualAction.startswith("FileManager"):
 			self.FileManager()
@@ -361,14 +387,13 @@ class App:
 			sys.exit()
 
 	def ActionPhoto(self):
+		myid = 769
 		tosend = '{"msg_id":769,"token":%s}' %self.token
 		if self.camconfig["capture_mode"] == "precise quality cont.":
 			if self.camconfig["precise_cont_capturing"] == "on":
 				tosend = '{"msg_id":770,"token":%s}' %self.token
-		self.srv.send(tosend)
-		conf = ""
-		while "param" not in conf:
-			conf = self.srv.recv(6096)
+				myid = 770
+		self.Comm(tosend)
 		self.ReadConfig()
 		self.UpdateUsage()
 		if self.camconfig["capture_mode"] == "precise quality cont.":
@@ -386,9 +411,7 @@ class App:
 	def ActionRecordStart(self):
 		self.UpdateUsage()
 		tosend = '{"msg_id":513,"token":%s}' %self.token
-		self.srv.send(tosend)
-		self.srv.recv(512)
-		self.srv.recv(512)
+		self.Comm(tosend)
 		self.brecord.config(text="STOP\nrecording", command=self.ActionRecordStop, bg="#ff6666")
 		self.brecord.update_idletasks()
 		self.bphoto.config(state=DISABLED)
@@ -397,10 +420,7 @@ class App:
 
 	def ActionRecordStop(self):
 		tosend = '{"msg_id":514,"token":%s}' %self.token
-		self.srv.send(tosend)
-		self.srv.recv(512)
-		self.srv.recv(512)
-		self.srv.recv(512)
+		self.Comm(tosend)
 		self.brecord.config(text="START\nrecording", command=self.ActionRecordStart, bg="#66ff66")
 		self.brecord.update_idletasks()
 		self.bphoto.config(state="normal")
@@ -410,10 +430,7 @@ class App:
 	
 	def ActionVideoStart(self):
 		tosend = '{"msg_id":259,"token":%s,"param":"none_force"}' %self.token
-		self.srv.send(tosend)
-		resp = ""
-		while '"msg_id":259' not in resp:
-			resp = self.srv.recv(512)
+		self.Comm(tosend)
 		try:
 			if self.custom_vlc_path != ".":
 				if os.path.isfile(self.custom_vlc_path):
@@ -453,8 +470,7 @@ class App:
 		if myoption == "camera_clock":
 			myvalue = time.strftime("%Y-%m-%d %H:%M:%S")
 		tosend = '{"msg_id":2,"token":%s, "type":"%s", "param":"%s"}' %(self.token, myoption, myvalue.replace("/","\\/"))
-		self.srv.send(tosend)
-		self.srv.recv(512)
+		self.Comm(tosend)
 		if myoption == "video_standard":
 			self.GetDetailConfig("video_resolution")
 		self.ReadConfig()
@@ -592,7 +608,6 @@ class App:
 		self.Cameramenu.entryconfig(3, state=DISABLED)
 		
 		self.thread_FileDown = threading.Thread(target=self.FileDownloadThread)
-#		self.thread_FileDown.setDaemon(True)
 		self.thread_FileDown.start()
 					
 			
@@ -603,13 +618,11 @@ class App:
 
 			if tkMessageBox.askyesno("Delete file", "Are you sure you want to DELETE\n\n%s\n\nThis action can't be undone!" %FilesToProcessStr):
 				tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM\/%s"}' %(self.token, self.MediaDir) #make sure we are still in the correct path
-				self.srv.send(tosend)
-				self.srv.recv(512)
+				self.Comm(tosend)
 				for FileTP in FilesToProcess:
 					self.FileProgress.config(text="Deleting %s" %FileTP, bg=self.defaultbg)
 					tosend = '{"msg_id":1281,"token":%s,"param":"%s"}' %(self.token, FileTP)
-					self.srv.send(tosend)
-					self.srv.recv(512)
+					self.Comm(tosend)
 					self.FileProgress.config(text="Deleted", bg=self.defaultbg)
 		except Exception:
 			self.FileProgress.config(text="No file selected!", bg="#ffdddd")
@@ -624,39 +637,25 @@ class App:
 			pass
 		self.content = Frame(self.mainwindow)
 		tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM"}' %self.token #lets seth initial path in camera
-		self.srv.send(tosend)
-		self.srv.recv(512)
+		self.Comm(tosend)
 		tosend = '{"msg_id":1282,"token":%s, "param":" -D -S"}' %self.token
-		self.srv.send(tosend)
-		DirListing = ""
-		FileListing = ""
-		while "listing" not in DirListing:
-			DirListing = self.srv.recv(1024)
-		
-		if len(DirListing) > 40:
-			DirListing = DirListing[35:]
-			for CamDir in DirListing.split(","):
-				dirname, dirsize, dirdate = re.findall('{"(.+)/":"(.+) bytes\|(.+)"}',CamDir)[0]
-			self.MediaDir = dirname
+		resp = self.Comm(tosend)
+		if len(resp["listing"]) > 0:
+			self.MediaDir = resp["listing"][0].keys()[0]
 			tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM\/%s"}' %(self.token, self.MediaDir) #lets seth final path in camera
-			self.srv.send(tosend)
-			self.srv.recv(512)
+			self.Comm(tosend)
 		
 			tosend = '{"msg_id":1282,"token":%s, "param":" -D -S"}' %self.token
-			self.srv.send(tosend)
-			time.sleep(1)
-			FileListing = ""
-			while "listing" not in FileListing:
-				FileListing = self.srv.recv(655350)
+			FileListing = {}
+			for each in self.Comm(tosend)["listing"]: FileListing.update(each)
 
-		if len(FileListing) < 40 :
+		if len(FileListing) == 0 :
 			self.LabelNoFiles = Label(self.content, width=30, pady=10, text="No files found", bg="#ffcccc")
 			self.LabelNoFiles.pack(side=TOP,fill=X)
 		else:
-			FileListing = FileListing[35:]
 			CamFiles=[]
-			for CamFile in FileListing.split(","):
-				filename, filesize, filedate = re.findall('{"(.+)":"(.+) bytes\|(.+)"}',CamFile)[0]
+			for filename in FileListing.keys():
+				filesize, filedate = re.findall('(.+) bytes\|(.+)',FileListing[filename])[0]
 				filesize = float(filesize)
 				filepre = 0
 				while 1:
