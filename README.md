@@ -5,7 +5,8 @@
 
 #### Control (Photo, Record, Live View), Configure & Manage files via PC & Wifi.
 
-### gui.exe is compiled - NO PYTHON INSTALLATION NEEDED
+### CC.exe is compiled - NO PYTHON INSTALLATION NEEDED
+#### CC.pyw - for all systems capable of running python with Tkinter
 
 
 -------
@@ -17,7 +18,6 @@ Windows Notepad is derping about newline style, use something better than that, 
 
 Edit settings.py with your camera IP. No need to launch this script
 
-* Gui.pyw - gui control program, PRE-RELEASE
 * Edit options.txt (un/comment lines as needed) and launch Camera_set.py to set uncommented options
 * Camera_all_options.py displays all possible options for all possible variables
 * Camera_get.py displays current settings from camera
