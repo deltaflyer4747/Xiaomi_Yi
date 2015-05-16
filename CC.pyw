@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.4.4"
+AppVersion = "0.4.5"
 
 import base64, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -224,6 +224,12 @@ class App:
 							if "msg_id" in data_dec.keys():
 								if data_dec["msg_id"] == 257:
 									self.token = data_dec["param"]
+								elif data_dec["msg_id"] == 7:
+									if "type" in data_dec.keys() and "param" in data_dec.keys():
+										if data_dec["type"] == "battery":
+											self.thread_read = threading.Thread(target=self.UpdateBattery)
+											self.thread_read.setName('UpdateBattery')
+											self.thread_read.start()
 								self.JsonData[data_dec["msg_id"]] = data_dec
 							else:
 								raise Exception('Unknown','data')
