@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.4.5"
+AppVersion = "0.4.6"
 
 import base64, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -22,16 +22,18 @@ class App:
 		self.DonateUrl = "http://sw.deltaflyer.cz/donate.html"
 		self.GitUrl = "https://github.com/deltaflyer4747/Xiaomi_Yi"
 		self.UpdateUrl = "https://raw.githubusercontent.com/deltaflyer4747/Xiaomi_Yi/master/version.txt"
-		self.ConfigInfo = {"auto_low_light":"Automaticaly increase exposure time in low-light conditions", "auto_power_off":"Power down camera after specified time of inactivity", "burst_capture_number":"Specify ammount of images taken in Burst mode", "buzzer_ring":"Enable/disable camera locator beacon", "buzzer_volume":"Volume of camera beep", "camera_clock":"Click Apply to set Camera clock to the same as this PC", "capture_default_mode":"Mode to enter when changing to Capture via system_default_mode/HW button", "capture_mode":"Changes behavior of \"Photo\" button", "led_mode":"Set preferred LED behavior", "loop_record":"Overwrites oldest files when memory card is full", "meter_mode":"Metering mode for exposure/white ballance", "osd_enable":"Overlay info to hdmi/TV out", "photo_quality":"Set quality of still images", "photo_size":"Set resolution of still images", "photo_stamp":"Overlay date and time of capture to still images", "precise_cont_time":"Delay between individual images in timelapse mode", "precise_selftime":"Set delay to capture in Timer mode", "preview_status":"Turn this on to enable LIVE view", "start_wifi_while_booted":"Enable WiFi on boot", "system_default_mode":"Mode for HW trigger to set when camera is turned on", "system_mode":"Current mode for HW trigger", "video_output_dev_type":"Select video out HDMI or AV out over USB, use same cable as SJ4000", "video_quality":"Set quality of video recordings", "video_rotate":"Rotate video by 180° (upsidedown mount)", "video_resolution":"video_resolution is limited by selected video_standard", "video_stamp":"Overlay date and time to video recordings", "video_standard":"video_standard limits possible video_resolution options", "warp_enable":"On = No fisheye (Compensation ON), Off = Fisheye (Compensation OFF)"}
+		self.ConfigInfo = {"auto_low_light":"Automaticaly increase exposure time in low-light conditions", "auto_power_off":"Power down camera after specified time of inactivity", "burst_capture_number":"Specify ammount of images taken in Burst mode", "buzzer_ring":"Enable/disable camera locator beacon", "buzzer_volume":"Volume of camera beep", "camera_clock":"Tick&Apply to set Camera clock to the same as this PC", "capture_default_mode":"Mode to enter when changing to Capture via system_default_mode/HW button", "capture_mode":"Changes behavior of \"Photo\" button", "emergency_file_backup":"Locks file when shock is detected-for car dashcam (related to \"loop_record\")", "led_mode":"Set preferred LED behavior", "loop_record":"Overwrites oldest files when memory card is full", "meter_mode":"Metering mode for exposure/white ballance", "osd_enable":"Overlay info to hdmi/TV out", "photo_quality":"Set quality of still images", "photo_size":"Set resolution of still images", "photo_stamp":"Overlay date and time of capture to still images", "precise_cont_time":"Delay between individual images in timelapse mode", "precise_selftime":"Set delay to capture in Timer mode", "preview_status":"Turn this on to enable LIVE view", "start_wifi_while_booted":"Enable WiFi on boot", "system_default_mode":"Mode for HW trigger to set when camera is turned on", "system_mode":"Current mode for HW trigger", "timelapse_video":"Create timelapse video from image taken every 2 seconds", "video_output_dev_type":"Select video out HDMI or AV out over USB, use same cable as SJ4000", "video_quality":"Set quality of video recordings", "video_rotate":"Rotate video by 180° (upsidedown mount)", "video_resolution":"video_resolution is limited by selected video_standard", "video_stamp":"Overlay date and time to video recordings", "video_standard":"video_standard limits possible video_resolution options", "warp_enable":"On = No fisheye (Compensation ON), Off = Fisheye (Compensation OFF)", "wifi_ssid":"WiFi network name; reboot camera after Apply to take effect", "wifi_password":"WiFi network password; reboot camera after Apply to take effect"}
+		self.ConfigTypes = {"auto_low_light":"checkbutton", "auto_power_off":"optionmenu", "burst_capture_number":"optionmenu", "buzzer_ring":"checkbutton", "buzzer_volume":"optionmenu", "camera_clock":"button", "capture_default_mode":"optionmenu", "emergency_file_backup":"checkbutton", "led_mode":"optionmenu", "loop_record":"checkbutton", "meter_mode":"optionmenu", "osd_enable":"checkbutton", "photo_quality":"optionmenu", "photo_size":"optionmenu", "photo_stamp":"optionmenu", "precise_cont_time":"optionmenu", "precise_selftime":"optionmenu", "preview_status":"checkbutton", "start_wifi_while_booted":"checkbutton", "system_default_mode":"radiobutton", "system_mode":"radiobutton", "timelapse_video":"radiobutton", "video_output_dev_type":"optionmenu", "video_quality":"optionmenu", "video_resolution":"optionmenu","video_rotate":"checkbutton", "video_stamp":"optionmenu", "video_standard":"radiobutton", "warp_enable":"checkbutton", "wifi_ssid":"entry", "wifi_password":"entry"}
+		self.ConfigIgnores = ["dev_reboot", "restore_factory_settings", "capture_mode", "precise_self_running"]
 		self.master = master
-		self.master.geometry("445x250+300+250")
+		self.master.geometry("445x250+300+75")
 		self.master.wm_title("Xiaomi Yi C&C by Andy_S | ver %s" %AppVersion)
 		
 		self.statusBlock = LabelFrame(self.master, bd=1, relief=SUNKEN, text="")
 		self.statusBlock.pack(side=BOTTOM, fill=X)
 		self.status = Label(self.statusBlock, width=28, text="Disconnected", anchor=W)
 		self.status.grid(column=0, row=0)
-		self.battery = Label(self.statusBlock, width=13, text="", anchor=W)
+		self.battery = Label(self.statusBlock, width=13, text="", anchor=E)
 		self.battery.grid(column=1, row=0)
 		self.usage = Label(self.statusBlock, width=20, text="", anchor=E)
 		self.usage.grid(column=2, row=0)
@@ -118,19 +120,21 @@ class App:
 
 	def GetAllConfig(self):
 		for param in self.camconfig.keys():
-			if param not in ["dev_reboot", "restore_factory_settings", "capture_mode", "wifi_ssid", "wifi_password"]:
+			if param not in self.ConfigIgnores:
 				tosend = '{"msg_id":3,"token":%s,"param":"%s"}' %(self.token, param)
 				resp = self.Comm(tosend)
 				thisresponse = resp["param"][0].values()[0]
 				if thisresponse.startswith('settable:'):
-					print param
-					thisoptions = re.findall('settable:(.+)', thisresponse)[0]
-					allparams = thisoptions.replace("\\/","/").split("#")
+					try:
+						thisoptions = re.findall('settable:(.+)', thisresponse)[0]
+						allparams = thisoptions.replace("\\/","/").split("#")
+					except:
+						allparams = ""
 					self.camsettableconfig[param]=allparams
 
 
 	def GetDetailConfig(self, param):
-		if param not in ["dev_reboot", "restore_factory_settings", "wifi_ssid", "wifi_password"]:
+		if param not in self.ConfigIgnores:
 			tosend = '{"msg_id":3,"token":%s,"param":"%s"}' %(self.token, param)
 			resp = self.Comm(tosend)
 			thisresponse = resp["param"][0].values()[0]
@@ -308,6 +312,7 @@ class App:
 		self.MenuControl()
 	
 	def MenuControl(self):
+		self.master.geometry("445x250+300+75")
 		self.ReadConfig()
 		try:
 			self.content.destroy()
@@ -472,69 +477,165 @@ class App:
 			tkMessageBox.showinfo("Live View", "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %(self.camaddr))
 	
 
-
 	def MenuConfig_Apply(self, *args):
-		myoption = self.config_thisoption.get()
-		myvalue = self.config_thisvalue.get()
-		
-		if myoption == "camera_clock":
-			myvalue = time.strftime("%Y-%m-%d %H:%M:%S")
-		tosend = '{"msg_id":2,"token":%s, "type":"%s", "param":"%s"}' %(self.token, myoption, myvalue.replace("/","\\/"))
-		self.Comm(tosend)
-		if myoption == "video_standard":
-			self.GetDetailConfig("video_resolution")
+		for ThisOption in self.config_ToChange.keys():
+			ThisValue = self.config_ToChange[ThisOption]
+			self.MenuConfig_Commit(ThisOption, ThisValue)
+		self.config_ToChange = {}
+			
+	def MenuConfig_Commit(self, ThisOption, ThisValue):
+		tosend = '{"msg_id":2,"token":%s, "type":"%s", "param":"%s"}' %(self.token, ThisOption, ThisValue.replace("/","\\/"))
+		if ThisOption == "camera_clock":
+			ThisValue = time.strftime("%Y-%m-%d %H:%M:%S")
 		self.ReadConfig()
+		self.Comm(tosend)
+
+	def MenuConfig_modify(self, *args):
+
+		ThisOption = self.ConfigValues[args[0]]
+		if ThisOption == "wifi_ssid":
+			ThisValue = self.Config_WiSS.get()
+		elif ThisOption == "wifi_password":
+			ThisValue = self.Config_WiPW.get()
+		else:
+			ThisValue = self.master.getvar(args[0])
+		self.config_ToChange[ThisOption] = ThisValue 
+
+		if ThisOption == "video_standard":
+			menu = self.config_VidRes['menu']
+			menu.delete(0, END)
+			if ThisValue == "NTSC":
+				for value in self.MenuConfig_VideoresNtsc:
+					menu.add_command(label=value, command=lambda value=value: self.config_VidResValue.set(value))
+			else:
+				for value in self.MenuConfig_VideoresPal:
+					menu.add_command(label=value, command=lambda value=value: self.config_VidResValue.set(value))
 
 
-	def MenuConfig_changed(self, *args):
-		myoption = self.config_thisoption.get()
-		
-		self.config_values = list(self.camsettableconfig[myoption])
-		self.config_thisvalue.set(self.camconfig[myoption].replace("\\/","/")) # default value
-		try:
-			self.config_note.config(text='*%s' %self.ConfigInfo[myoption], bg="#ffff88")
-		except Exception:
-			self.config_note.config(text='* Unknown config option, if you know what it does, let me know.', bg=self.defaultbg)
-		menu = self.config_valuebox['menu']
-		menu.delete(0, END)
-		for value in self.config_values:
-			menu.add_command(label=value, command=lambda value=value: self.config_thisvalue.set(value))
+	def myfunction(self, event):
+		self.controlcanvas.configure(scrollregion=self.controlcanvas.bbox("all"),width=740,height=485)
 
 	def MenuConfig(self):
+		self.master.geometry("760x550+300+75")
 		self.ReadConfig()
 		self.GetAllConfig()
 		try:
 			self.content.destroy()
 		except Exception:
 			pass
-		self.content = Frame(self.mainwindow)
-
-		self.controlnote = Frame(self.content, height=20)
-		self.config_note = Label(self.controlnote, width=63, text="", anchor=W)
-		self.config_note.pack(side=LEFT, fill=X, padx=5)
-		self.controlnote.pack(side=TOP, fill=X)
 		
-		self.controlselect = Frame(self.content)
+		#First step of video_standard workaround
+		This_video_standard = self.camconfig["video_standard"]
+		This_video_resolution = self.camconfig["video_resolution"]
+		if This_video_standard == "NTSC":
+			self.MenuConfig_VideoresNtsc = self.camsettableconfig["video_resolution"]
+			self.MenuConfig_Commit("video_standard", "PAL")
+			self.GetDetailConfig("video_resolution")
+			self.MenuConfig_VideoresPal = self.camsettableconfig["video_resolution"]
+			self.MenuConfig_Commit("video_standard", "NTSC")
+			self.GetDetailConfig("video_resolution")
+		else:		
+			self.MenuConfig_VideoresPal = self.camsettableconfig["video_resolution"]
+			self.MenuConfig_Commit("video_standard", "NTSC")
+			self.GetDetailConfig("video_resolution")
+			self.MenuConfig_VideoresNtsc = self.camsettableconfig["video_resolution"]
+			self.MenuConfig_Commit("video_standard", "PAL")
+			self.GetDetailConfig("video_resolution")
+		self.MenuConfig_Commit("video_resolution", This_video_resolution)
+		
+		
+		self.status = []
+		self.config_ToChange = {}
 		self.config_options = sorted(self.camsettableconfig.keys())
-		self.config_thisoption = StringVar(self.controlselect)
-		self.config_thisoption.trace("w", self.MenuConfig_changed)
-		self.config_optionbox = OptionMenu(self.controlselect, self.config_thisoption, *self.config_options)
-		self.config_optionbox.config(width=20)
-		self.config_optionbox.pack(side=LEFT, padx=10, pady=5)
-		self.config_thisvalue = StringVar(self.controlselect)
-		self.config_thisvalue.set(self.camconfig[self.config_options[0]]) # default value
-		self.config_valuebox = OptionMenu(self.controlselect, self.config_thisvalue, '')
-		self.config_thisoption.set(self.config_options[0]) # default value
-		self.config_valuebox.config(width=20)
-		self.config_valuebox.pack(side=LEFT, padx=10, pady=5)
+		self.content = Frame(self.mainwindow, width=445, height=490)
+		self.controlselect = Frame(self.content)
+		self.controlselect.place(x=0,y=0)
+		self.controlcanvas = Canvas(self.controlselect)
+		self.controloptions = Frame(self.controlcanvas)
+		self.config_scrollbar=Scrollbar(self.controlselect,orient="vertical",command=self.controlcanvas.yview)
+		self.controlcanvas.configure(yscrollcommand=self.config_scrollbar.set)	
+		self.config_scrollbar.pack(side="right",fill="y")
+		self.controlcanvas.pack(side="left")
+		self.controlcanvas.create_window((0,0),window=self.controloptions,anchor='nw')
+		self.controloptions.bind("<Configure>",self.myfunction)
 
-
-		self.controlselect.pack(side=TOP, fill=X)
-
-		self.controlbuttons = Frame(self.content)
+		self.controlbuttons = Frame(self.controloptions, width=445, height=20)
 		self.config_apply = Button(self.controlbuttons, text="Apply", width=7, command=self.MenuConfig_Apply)
 		self.config_apply.pack(side=LEFT, padx=10, pady=5)
 		self.controlbuttons.pack(side=TOP, fill=X)
+
+		row = 0
+		self.ConfigValues = {}
+		for ThisOption in self.config_options:
+			if ThisOption in self.ConfigTypes.keys():
+				ThisType = self.ConfigTypes[ThisOption]
+			else:
+				ThisType = "optionmenu"
+			ThisFrame = Frame(self.controloptions)
+			ThisLabel = Label(ThisFrame, width=18, text=ThisOption, anchor=W).grid(row=row,column=0)
+			if ThisOption == "video_resolution":
+				self.config_VidResValue = StringVar(self.controlselect)
+				self.config_VidResValue.set(self.camconfig[ThisOption])
+				self.config_VidResValue.trace("w", self.MenuConfig_modify)
+				self.ConfigValues[self.config_VidResValue._name] = ThisOption
+				self.config_VidRes = OptionMenu(ThisFrame, self.config_VidResValue, *self.camsettableconfig[ThisOption])
+				self.config_VidRes.config(width=18, anchor=W)
+				self.config_VidRes.grid(row=row,column=1)
+			else:
+				ThisValue = StringVar(self.controlselect)
+				ThisValue.set(self.camconfig[ThisOption])
+				ThisValue.trace("w", self.MenuConfig_modify)
+				self.ConfigValues[ThisValue._name] = ThisOption
+				if ThisType == "optionmenu":
+					ValueBox = OptionMenu(ThisFrame, ThisValue, *self.camsettableconfig[ThisOption])
+					ValueBox.config(width=18, anchor=W)
+					ValueBox.grid(row=row,column=1)
+				elif ThisType == "checkbutton":
+					ValueBox = Checkbutton(ThisFrame, variable=ThisValue, onvalue="on", offvalue="off")
+					ValueBox.config(width=18, anchor=W)
+					ValueBox.grid(row=row,column=1)
+					self.status.append((ValueBox,ThisValue))
+				elif ThisType == "button":
+					ValueBox = Checkbutton(ThisFrame, text=self.camconfig[ThisOption], variable=ThisValue, onvalue="on", offvalue="off")
+					ValueBox.config(width=18, anchor=W)
+					ValueBox.grid(row=row,column=1)
+					self.status.append((ValueBox,ThisValue))
+				elif ThisType == "radiobutton":
+					RadioFrame = Frame(ThisFrame)
+					ValueBox1 = Radiobutton(RadioFrame, text=self.camsettableconfig[ThisOption][0], variable=ThisValue, value=self.camsettableconfig[ThisOption][0])
+					ValueBox1.config(width=7, anchor=W)
+					ValueBox1.pack(side=LEFT)
+					ValueBox2 = Radiobutton(RadioFrame, text=self.camsettableconfig[ThisOption][1], variable=ThisValue, value=self.camsettableconfig[ThisOption][1])
+					ValueBox2.config(width=7, anchor=E)
+					ValueBox2.pack(side=RIGHT)
+					RadioFrame.grid(row=row,column=1)
+					self.status.append((ValueBox1,ThisValue))
+					self.status.append((ValueBox2,ThisValue))
+				elif ThisType == "entry":
+					if ThisOption == "wifi_ssid":
+						self.Config_WiSS = ThisValue
+						ValueBox = Entry(ThisFrame, textvariable=self.Config_WiSS, width=25)
+						ValueBox.grid(row=row,column=1)
+						self.status.append((ValueBox,self.Config_WiSS))
+					elif ThisOption == "wifi_password":
+						self.Config_WiPW = ThisValue
+						ValueBox = Entry(ThisFrame, textvariable=self.Config_WiPW, width=25)
+						ValueBox.grid(row=row,column=1)
+						self.status.append((ValueBox,self.Config_WiPW))
+			
+			if ThisOption in self.ConfigInfo:
+				ThisHint = Label(ThisFrame, width=62, text="*%s" %self.ConfigInfo[ThisOption], anchor=W).grid(row=row, column=2, padx=10)
+			else:
+				ThisHint = Label(ThisFrame, width=62, text='* Unknown config option, if you know what it does, let me know.' , anchor=W).grid(row=row, column=2, padx=10)
+			ThisFrame.pack(side=TOP)
+			row += 1
+
+		self.controlbuttons = Frame(self.controloptions, width=445, height=20)
+		self.config_apply = Button(self.controlbuttons, text="Apply", width=7, command=self.MenuConfig_Apply)
+		self.config_apply.pack(side=LEFT, padx=10, pady=5)
+		self.controlbuttons.pack(side=TOP, fill=X)
+
+
 		self.content.pack(side=TOP, fill=X)
 	
 	
@@ -640,6 +741,7 @@ class App:
 		self.FileManager("Deleted")
 	
 	def FileManager(self, FileProgressStr="Select a file"):
+		self.master.geometry("445x550+300+75")
 		self.ActualAction = "FileManager"
 		FileListing = {}
 		try:
@@ -687,7 +789,7 @@ class App:
 			self.LabelFileDate.grid(column=2, row=0)        	
 
 			self.FilesScrollbar = Scrollbar(self.filelist, orient=VERTICAL)
-			self.ListboxFileName = Listbox(self.filelist, yscrollcommand=self.FilesScrollbar.set, selectmode=EXTENDED, height=8, width=20, bd=0, bg="#ffffff", fg="#000000", highlightcolor="#ffffff", highlightthickness=0)
+			self.ListboxFileName = Listbox(self.filelist, yscrollcommand=self.FilesScrollbar.set, selectmode=EXTENDED, height=27, width=20, bd=0, bg="#ffffff", fg="#000000", highlightcolor="#ffffff", highlightthickness=0)
 			self.ListboxFileSize = Listbox(self.filelist, yscrollcommand=self.FilesScrollbar.set, height=8, width=12, bd=0, bg="#ffffff", fg="#000000", activestyle=NONE, highlightcolor="#ffffff", highlightthickness=0, selectborderwidth=0, selectbackground="#ffffff", selectforeground="#000000")
 			self.ListboxFileDate = Listbox(self.filelist, yscrollcommand=self.FilesScrollbar.set, height=8, width=30, bd=0, bg="#ffffff", fg="#000000", activestyle=NONE, highlightcolor="#ffffff", highlightthickness=0, selectborderwidth=0, selectbackground="#ffffff", selectforeground="#000000")
 			self.FilesScrollbar.config(command=self.FileYScroll)
