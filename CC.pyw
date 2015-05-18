@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.4.6"
+AppVersion = "0.4.7"
 
 import base64, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -234,6 +234,28 @@ class App:
 											self.thread_read = threading.Thread(target=self.UpdateBattery)
 											self.thread_read.setName('UpdateBattery')
 											self.thread_read.start()
+										elif data_dec["type"] == "start_photo_capture":
+											if self.camconfig["capture_mode"] == "precise quality cont.":
+												self.bphoto.config(text="Stop\nTIMELAPSE", bg="#ff6666")
+												self.brecord.config(state=DISABLED) 
+												self.brecord.update_idletasks()
+												self.bphoto.update_idletasks()
+												self.thread_ReadConfig = threading.Thread(target=self.ReadConfig)
+												self.thread_ReadConfig.setDaemon(True)
+												self.thread_ReadConfig.setName('ReadConfig')
+												self.thread_ReadConfig.start()
+										elif data_dec["type"] == "precise_cont_complete":
+											if self.camconfig["capture_mode"] == "precise quality cont.":
+												self.bphoto.config(text="Start\nTIMELAPSE", bg="#66ff66")
+												self.brecord.config(state="normal") 
+												self.brecord.update_idletasks()
+												self.bphoto.update_idletasks()
+												self.thread_ReadConfig = threading.Thread(target=self.ReadConfig)
+												self.thread_ReadConfig.setDaemon(True)
+												self.thread_ReadConfig.setName('ReadConfig')
+												self.thread_ReadConfig.start()
+
+
 								self.JsonData[data_dec["msg_id"]] = data_dec
 							else:
 								raise Exception('Unknown','data')
@@ -408,19 +430,11 @@ class App:
 			if self.camconfig["precise_cont_capturing"] == "on":
 				tosend = '{"msg_id":770,"token":%s}' %self.token
 				myid = 770
-		self.Comm(tosend)
+			self.Comm(tosend)
+		else:
+			self.Comm(tosend)
 		self.ReadConfig()
 		self.UpdateUsage()
-		if self.camconfig["capture_mode"] == "precise quality cont.":
-			if self.camconfig["precise_cont_capturing"] == "off":
-				self.bphoto.config(text="Start\nTIMELAPSE", bg="#66ff66")
-				self.brecord.config(state="normal") 
-			else:
-				self.bphoto.config(text="Stop\nTIMELAPSE", bg="#ff6666")
-				self.brecord.config(state=DISABLED) 
-
-			self.brecord.update_idletasks()
-			self.bphoto.update_idletasks()
 
 
 	def ActionRecordStart(self):
