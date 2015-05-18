@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.4.7"
+AppVersion = "0.5.1"
 
 import base64, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -18,13 +18,16 @@ class App:
 		self.defaultbg = master.cget('bg')
 		self.camsettableconfig = {}
 		self.JsonData = {}
+		self.MediaDir = ""
+		self.ExpertMode = ""
 		
 		self.DonateUrl = "http://sw.deltaflyer.cz/donate.html"
 		self.GitUrl = "https://github.com/deltaflyer4747/Xiaomi_Yi"
 		self.UpdateUrl = "https://raw.githubusercontent.com/deltaflyer4747/Xiaomi_Yi/master/version.txt"
 		self.ConfigInfo = {"auto_low_light":"Automaticaly increase exposure time in low-light conditions", "auto_power_off":"Power down camera after specified time of inactivity", "burst_capture_number":"Specify ammount of images taken in Burst mode", "buzzer_ring":"Enable/disable camera locator beacon", "buzzer_volume":"Volume of camera beep", "camera_clock":"Tick&Apply to set Camera clock to the same as this PC", "capture_default_mode":"Mode to enter when changing to Capture via system_default_mode/HW button", "capture_mode":"Changes behavior of \"Photo\" button", "emergency_file_backup":"Locks file when shock is detected-for car dashcam (related to \"loop_record\")", "led_mode":"Set preferred LED behavior", "loop_record":"Overwrites oldest files when memory card is full", "meter_mode":"Metering mode for exposure/white ballance", "osd_enable":"Overlay info to hdmi/TV out", "photo_quality":"Set quality of still images", "photo_size":"Set resolution of still images", "photo_stamp":"Overlay date and time of capture to still images", "precise_cont_time":"Delay between individual images in timelapse mode", "precise_selftime":"Set delay to capture in Timer mode", "preview_status":"Turn this on to enable LIVE view", "start_wifi_while_booted":"Enable WiFi on boot", "system_default_mode":"Mode for HW trigger to set when camera is turned on", "system_mode":"Current mode for HW trigger", "timelapse_video":"Create timelapse video from image taken every 2 seconds", "video_output_dev_type":"Select video out HDMI or AV out over USB, use same cable as SJ4000", "video_quality":"Set quality of video recordings", "video_rotate":"Rotate video by 180° (upsidedown mount)", "video_resolution":"video_resolution is limited by selected video_standard", "video_stamp":"Overlay date and time to video recordings", "video_standard":"video_standard limits possible video_resolution options", "warp_enable":"On = No fisheye (Compensation ON), Off = Fisheye (Compensation OFF)", "wifi_ssid":"WiFi network name; reboot camera after Apply to take effect", "wifi_password":"WiFi network password; reboot camera after Apply to take effect"}
-		self.ConfigTypes = {"auto_low_light":"checkbutton", "auto_power_off":"optionmenu", "burst_capture_number":"optionmenu", "buzzer_ring":"checkbutton", "buzzer_volume":"optionmenu", "camera_clock":"button", "capture_default_mode":"optionmenu", "emergency_file_backup":"checkbutton", "led_mode":"optionmenu", "loop_record":"checkbutton", "meter_mode":"optionmenu", "osd_enable":"checkbutton", "photo_quality":"optionmenu", "photo_size":"optionmenu", "photo_stamp":"optionmenu", "precise_cont_time":"optionmenu", "precise_selftime":"optionmenu", "preview_status":"checkbutton", "start_wifi_while_booted":"checkbutton", "system_default_mode":"radiobutton", "system_mode":"radiobutton", "timelapse_video":"radiobutton", "video_output_dev_type":"optionmenu", "video_quality":"optionmenu", "video_resolution":"optionmenu","video_rotate":"checkbutton", "video_stamp":"optionmenu", "video_standard":"radiobutton", "warp_enable":"checkbutton", "wifi_ssid":"entry", "wifi_password":"entry"}
+		self.ConfigTypes = {"auto_low_light":"checkbutton", "auto_power_off":"optionmenu", "burst_capture_number":"optionmenu", "buzzer_ring":"checkbutton", "buzzer_volume":"optionmenu", "camera_clock":"button", "capture_default_mode":"optionmenu", "emergency_file_backup":"checkbutton", "led_mode":"optionmenu", "loop_record":"checkbutton", "meter_mode":"optionmenu", "osd_enable":"checkbutton", "photo_quality":"optionmenu", "photo_size":"optionmenu", "photo_stamp":"optionmenu", "precise_cont_time":"optionmenu", "precise_selftime":"optionmenu", "preview_status":"checkbutton", "start_wifi_while_booted":"checkbutton", "system_default_mode":"radiobutton", "system_mode":"radiobutton", "timelapse_photo":"radiobutton", "timelapse_video":"radiobutton", "video_output_dev_type":"optionmenu", "video_quality":"optionmenu", "video_resolution":"optionmenu","video_rotate":"checkbutton", "video_stamp":"optionmenu", "video_standard":"radiobutton", "warp_enable":"checkbutton", "wifi_ssid":"entry", "wifi_password":"entry"}
 		self.ConfigIgnores = ["dev_reboot", "restore_factory_settings", "capture_mode", "precise_self_running"]
+		self.FileTypes = {"/":"Folder", ".bmp":"Image", ".ico":"Image", ".jpg":"Image", ".mka":"Audio", ".mkv":"Video", "mp3":"Audio", ".mp4":"Video", ".mpg":"Video", ".png":"Image", ".txt":"Text", "wav":"Audio"}
 		self.master = master
 		self.master.geometry("445x250+300+75")
 		self.master.wm_title("Xiaomi Yi C&C by Andy_S | ver %s" %AppVersion)
@@ -37,55 +40,8 @@ class App:
 		self.battery.grid(column=1, row=0)
 		self.usage = Label(self.statusBlock, width=20, text="", anchor=E)
 		self.usage.grid(column=2, row=0)
-
-		try: #open the settings file (if exists) and read the settings
-			filet = open("settings.cfg","r").read()
-			if "\r\n" in filet:
-				filek = filet.split("\r\n")
-			else:
-				filek = filet.split("\n")
-			
-			for param in filek:
-				if len(param) > 4:
-					pname, pvalue = re.findall ("(.+) = (.+)", param)[0]
-					if pname in ("camaddr", "camport", "camwebport", "custom_vlc_path"): setattr(self, pname, pvalue)
-			if not {"camaddr", "camport", "camwebport", "custom_vlc_path"} < set(filet.split()): raise
-		except Exception: #no settings file yet, lets create default one & set defaults
-			filet = open("settings.cfg","w")
-			filet.write('camaddr = 192.168.42.1\r\n') 
-			filet.write('camport = 7878\r\n')
-			filet.write('camwebport = 80\r\n')
-			filet.write('custom_vlc_path = .\r\n')
-			filet.close()
-			self.camaddr = "192.168.42.1"
-			self.camport = 7878
-			self.camwebport = 80
-			self.custom_vlc_path = "."
+		self.Settings()
 	
-		self.camconn = Frame(self.master) #create connection window with buttons
-		b = Button(self.camconn, text="Connect", width=7, command=self.CamConnect)
-		b.focus_set()
-		b.pack(side=LEFT, padx=10, pady=2)
-		self.addrv1 = StringVar()
-		self.addrv2 = StringVar()
-		self.addrv3 = StringVar()
-		l = Label(self.camconn, width=3, text="IP:", anchor=E)
-		l.pack(side=LEFT)
-		e1 = Entry(self.camconn, textvariable=self.addrv1, width=15)
-		e1.pack(side=LEFT)
-		l = Label(self.camconn, width=6, text="port:", anchor=E)
-		l.pack(side=LEFT)
-		e2 = Entry(self.camconn, textvariable=self.addrv2, width=6)
-		e2.pack(side=LEFT)
-		l = Label(self.camconn, width=10, text="Web port:", anchor=E)
-		l.pack(side=LEFT)
-		e3 = Entry(self.camconn, textvariable=self.addrv3, width=6)
-		e3.pack(side=LEFT)
-		self.addrv1.set(self.camaddr)
-		self.addrv2.set(self.camport)
-		self.addrv3.set(self.camwebport)
-		self.camconn.pack(side=TOP, fill=X)
-		
 		
 		# create a menu
 		self.menu = Menu(self.master)
@@ -97,20 +53,116 @@ class App:
 		self.Cameramenu.add_command(label="Format", command=self.ActionFormat, state=DISABLED, underline=0)
 		self.Cameramenu.add_command(label="Reboot", command=self.ActionReboot, state=DISABLED, underline=0)
 		self.Cameramenu.add_command(label="Factory settings", command=self.ActionFactory, state=DISABLED, underline=8)
+		if self.ExpertMode == "":
+			self.Cameramenu.add_command(label="Expert Mode", command=self.ExpertEnable, state=DISABLED)
 		self.Cameramenu.add_separator()
 		self.Cameramenu.add_command(label="Exit", command=self.quit, underline=1)
 		
 		self.helpmenu = Menu(self.menu, tearoff=0)
 		self.menu.add_cascade(label="Help", menu=self.helpmenu, underline=0)
-		
 		self.helpmenu.add_command(label="Donate", command=lambda aurl=self.DonateUrl:webbrowser.open_new(aurl), underline=0)
 		self.helpmenu.add_command(label="About...", command=self.AboutProg, underline=0)
 		self.UpdateCheck()
+		self.ConnWindow()		
 				
+
+	def Settings(self, add="", rem=""):
+		if add == "" and rem == "": #nothing to add or remove = initial call
+			try: #open the settings file (if exists) and read the settings
+				filek = open("settings.cfg","r")
+				filet = filek.read()
+				filek.close()
+				ConfigFile = json.loads(filet)
+				
+				for pname in ConfigFile.keys():
+					pvalue = ConfigFile[pname]
+					if pname in ("camaddr", "camauto", "camport", "camdataport", "camwebport", "custom_vlc_path", "ExpertMode"): setattr(self, pname, pvalue)
+				if not {"camaddr", "camauto", "camport", "camdataport", "camwebport", "custom_vlc_path"} <= set(ConfigFile.keys()): raise
+			except Exception: #no settings file yet, lets create default one & set defaults
+				print set(ConfigFile.keys())
+				filek = open("settings.cfg","w")
+				ConfigFile = '{"camaddr":"192.168.42.1","camauto":"","camport":7878,"camdataport":8787,"camwebport":80,"custom_vlc_path":"."}'
+				filek.write(ConfigFile) 
+				filek.close()
+				self.camaddr = "192.168.42.1"
+				self.camport = 7878
+				self.camdataport = 8787
+				self.camwebport = 80
+				self.custom_vlc_path = "."
+		else:
+			if len(add)>0:
+				filek = open("settings.cfg","r")
+				filet = filek.read()
+				filek.close()
+				ConfigFile = json.loads(filet)
+				ConfigFile.update(add)
+				filek = open("settings.cfg","w")
+				filek.write(json.dumps(ConfigFile)) 
+				filek.close()
+			elif len(rem)>0:
+				filek = open("settings.cfg","r")
+				filet = filek.read()
+				filek.close()
+				ConfigFile = json.loads(filet)
+				for pname in add:
+					del ConfigFile[pname]
+				filek = open("settings.cfg","w")
+				filek.write(json.dumps(ConfigFile)) 
+				filek.close()
+	
+	def ConnWindow(self):
+		self.camconn = Frame(self.master) #create connection window with buttons
+		self.addrv1 = StringVar()
+		self.addrv2 = StringVar()
+		self.addrv3 = StringVar()
+		self.addrv4 = StringVar()
+		self.addrv5 = StringVar()
+		self.addrv6 = StringVar()
+		b = Button(self.camconn, text="Connect C&C", width=11, command=self.CamConnect)
+		b.focus_set()
+		b.grid(row=1, column=1, padx=10, pady=2)
+		c = Checkbutton(self.camconn, text="Autoconnect", variable=self.addrv3, onvalue="on", offvalue="", height=1)
+		c.grid(row=2, column=1)
+
+
+		l = Label(self.camconn, width=12, text="IP address:", anchor=E)
+		l.grid(row=1, column=2)
+		e1 = Entry(self.camconn, textvariable=self.addrv1, width=20)
+		e1.grid(row=1, column=3)
+		l = Label(self.camconn, width=12, text="Own VLC Path:", anchor=E)
+		l.grid(row=2, column=2)
+		e5 = Entry(self.camconn, textvariable=self.addrv6, width=20)
+		e5.grid(row=2, column=3)
+		l = Label(self.camconn, width=17, text="*default path = .", anchor=W)
+		l.grid(row=3, column=3, pady=3)
+
+		l = Label(self.camconn, width=10, text="Json Port:", anchor=E)
+		l.grid(row=1, column=4)
+		e2 = Entry(self.camconn, textvariable=self.addrv2, width=4)
+		e2.grid(row=1, column=5)
+		l = Label(self.camconn, width=10, text="Data Port:", anchor=E)
+		l.grid(row=2, column=4)
+		e3 = Entry(self.camconn, textvariable=self.addrv4, width=4)
+		e3.grid(row=2, column=5)
+		l = Label(self.camconn, width=10, text="Web Port:", anchor=E)
+		l.grid(row=3, column=4)
+		e4 = Entry(self.camconn, textvariable=self.addrv5, width=4)
+		e4.grid(row=3, column=5)
+		self.addrv1.set(self.camaddr)
+		self.addrv2.set(self.camport)
+		self.addrv3.set(self.camauto)
+		self.addrv4.set(self.camdataport)
+		self.addrv5.set(self.camwebport)
+		self.addrv6.set(self.custom_vlc_path)
+		self.camconn.pack(side=TOP, fill=X)
+		if self.camauto == "on":
+			self.CamConnect()
+
+
 
 	def UpdateCheck(self):
 		try:
-			newversion = urllib2.urlopen(self.UpdateUrl).read()
+			newversion = urllib2.urlopen(self.UpdateUrl, timeout=2).read()
 		except Exception:
 			newversion = "0"
 		if newversion > AppVersion:
@@ -162,7 +214,10 @@ class App:
 		try:
 			self.camaddr = self.addrv1.get() #read IP address from inputbox
 			self.camport = int(self.addrv2.get()) #read port from inputbox & convert to integer
-			self.camwebport = int(self.addrv3.get()) #read port from inputbox & convert to integer
+			self.camauto = self.addrv3.get() #read autoconnect status
+			self.camdataport = int(self.addrv4.get()) #read data port from inputbox & convert to integer
+			self.camwebport = int(self.addrv5.get()) #read web port from inputbox & convert to integer
+			self.custom_vlc_path = self.addrv6.get() #read custom_vlc_path
 			socket.setdefaulttimeout(5)
 			self.srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create socket
 			self.srv.connect((self.camaddr, self.camport)) #open socket
@@ -180,25 +235,24 @@ class App:
 					continue
 				else:
 					raise Exception('Connection', 'failed') #throw an exception
-			filet = open("settings.cfg","w")
-			filet.write('camaddr = %s\r\n' %self.camaddr) 
-			filet.write('camport = %s\r\n' %self.camport)
-			filet.write('camwebport = %s\r\n' %self.camwebport)
-			filet.write('custom_vlc_path = %s\r\n' %self.custom_vlc_path)
-			filet.close()
+			ToWrite = {"camaddr":self.camaddr, "camauto":self.camauto, "camport":self.camport, "camdataport":self.camdataport, "camwebport": self.camwebport, "custom_vlc_path":self.custom_vlc_path}
+			self.Settings(add=ToWrite)
 			self.status.config(text="Connected") #display status message in statusbar
 			self.status.update_idletasks()
 			self.camconn.destroy() #hide connection selection
+			self.UpdateUsage()
+			self.UpdateBattery()
 			self.Cameramenu.entryconfig(0, state="normal")
 			self.Cameramenu.entryconfig(1, state="normal")
 			self.Cameramenu.entryconfig(2, state="normal")
 			self.Cameramenu.entryconfig(3, state="normal")
-	
-	
-			self.ReadConfig()
-			self.UpdateUsage()
-			self.UpdateBattery()
+			if self.ExpertMode == "":
+				self.Cameramenu.entryconfig(4, state="normal")
+			else:
+				self.ShowExpertMenu()
+			
 			self.MainWindow()
+
 		except Exception:
 			self.connected = False
 			tkMessageBox.showerror("Connect", "Cannot connect to the address specified")
@@ -320,6 +374,45 @@ class App:
 		self.battery.config(text=battery) #display usage message in statusbar
 		self.battery.update_idletasks()
 	
+	def ShowExpertMenu(self):
+		self.Expertmenu = Menu(self.menu, tearoff=0)
+		self.menu.add_cascade(label="ExpertMenu", menu=self.Expertmenu, underline=0)
+		self.Expertmenu.add_command(label="Show all camera variables", command=self.ExpertVariables, underline=0)
+		self.Expertmenu.add_command(label="Enable Telnet access", command=self.ExpertTelnet, underline=0)
+		self.Expertmenu.add_command(label="Activate camera jetpack", command=self.ActionInfo, state=DISABLED, underline=0)
+		self.Expertmenu.add_command(label="Explode camera", command=self.ActionInfo, state=DISABLED, underline=0)
+		self.Expertmenu.add_command(label="Kill ALL puppies", command=self.ActionInfo, state=DISABLED, underline=0)
+		
+	def ExpertVariables(self):
+		toshow = ""
+		for pname in sorted(self.camconfig):
+			pvalue = self.camconfig[pname]
+			toshow += "%s: %s\n" %(pname, pvalue)
+		tkMessageBox.showinfo("All current camera variables", toshow)
+			
+	def ExpertTelnet(self):
+		tosend = '{"msg_id":1283,"token":%s,"param":"."}' %self.token
+		self.curPwd = self.Comm(tosend)["pwd"].replace("/","\\/")
+		tosend = '{"msg_id":1283,"token":%s,"param":"\/tmp\/fuse_d"}' %self.token
+		self.Comm(tosend)
+		tosend = '{"msg_id":1286,"token":%s,"param":"enable_info_display.script", "offset":0, "size":0, "md5sum":"d41d8cd98f00b204e9800998ecf8427e"}' %self.token
+		self.Comm(tosend)
+		if tkMessageBox.askyesno("Restart Camera", "You have to reboot camera for telnet to be enabled.\n\nReboot now? (C&C will close)"):
+			tosend = '{"msg_id":2,"token":%s, "type":"dev_reboot", "param":"on"}' %self.token
+			self.srv.send(tosend)
+			time.sleep(1)
+			sys.exit()
+		else:
+			tosend = '{"msg_id":1283,"token":%s,"param":"%s"}' %(self.token, self.curPwd)
+			self.Comm(tosend)
+			if self.ActualAction.startswith("FileManager"):
+				self.FilePrintList()
+
+
+		
+
+
+
 	def MainWindow(self):
 		self.mainwindow = Frame(self.master, width=550, height=400)
 		self.topbuttons = Frame(self.mainwindow, bg="#aaaaff")
@@ -397,6 +490,15 @@ class App:
 
 		
 	
+	def ExpertEnable(self):
+		if tkMessageBox.askyesno("Enable expert mode", "Are you sure you want to\nENABLE EXPERT MODE?\n\nThis will enable potentionaly dangerous,\nbut also enhanced and useful features!\n\nBy accepting this you accept\nall responsibility for your actions you do\nin expert mode.\n\nAuthor of this program does not take ANY responsibility\nfor potentional damage to your camera\ncaused by your improper usage of this software."):
+			self.ExpertMode = self.camconfig["serial_number"]
+			tosend = {"ExpertMode":self.ExpertMode}
+			self.Settings(add=tosend)
+			self.Cameramenu.delete(4)
+			self.ShowExpertMenu()
+
+
 	def ActionInfo(self):
 		tkMessageBox.showinfo("Camera information", "SW ver: %s\nHW ver: %s\nSN: %s" %(self.camconfig["sw_version"], self.camconfig["hw_version"], self.camconfig["serial_number"]))
 		self.UpdateUsage()
@@ -407,7 +509,7 @@ class App:
 			self.Comm(tosend)
 		self.UpdateUsage()
 		if self.ActualAction.startswith("FileManager"):
-			self.FileManager()
+			self.FilePrintList()
 
 	def ActionReboot(self):
 		if tkMessageBox.askyesno("Reboot camera", "Are you sure you want to\nreboot camera?\n\nThis will close C&C"):
@@ -689,18 +791,17 @@ class App:
 
 	def FileDownloadThread(self):
 		try:
-			time.sleep(1)
 			FilesToProcess = [self.ListboxFileName.get(idx) for idx in self.ListboxFileName.curselection()]
-			FilesToProcessStr = "\n".join(FilesToProcess)
 			if not os.path.isdir("Files"):
 				os.mkdir("Files",0o777)
 			for FileTP in FilesToProcess:
-				self.FileProgress.config(text="Downloading", bg=self.defaultbg)
-				response = urllib2.urlopen('http://%s:%s/DCIM/%s/%s' %(self.camaddr, self.camwebport, self.MediaDir, FileTP))
-				try:
-					self.FileDownChunk(response, report_hook=self.FileDownReport, FileTP=FileTP)
-				except Exception:
-					pass
+				if not FileTP.endswith("/"):
+					self.FileProgress.config(text="Downloading", bg=self.defaultbg)
+					response = urllib2.urlopen('http://%s:%s/DCIM/%s/%s' %(self.camaddr, self.camwebport, self.MediaDir, FileTP))
+					try:
+						self.FileDownChunk(response, report_hook=self.FileDownReport, FileTP=FileTP)
+					except Exception:
+						pass
 			self.MainButtonControl.config(state="normal")
 			self.MainButtonConfigure.config(state="normal")
 			self.MainButtonFiles.config(state="normal")
@@ -711,7 +812,7 @@ class App:
 			self.Cameramenu.entryconfig(3, state="normal")
 							
 		except Exception:
-			self.FileProgress.config(text="No file selected!", bg="#ffdddd")
+			self.FileProgress.config(text="File download failed!", bg="#ffdddd")
 			self.MainButtonControl.config(state="normal")
 			self.MainButtonConfigure.config(state="normal")
 			self.MainButtonFiles.config(state="normal")
@@ -736,51 +837,104 @@ class App:
 		self.thread_FileDown.start()
 					
 			
+	def FileCwd(self):
+		if len(self.ListboxFileName.curselection()) == 1:
+			cwd = self.ListboxFileName.get(self.ListboxFileName.curselection()[0])
+			if cwd.endswith("/"):
+				tosend = '{"msg_id":1283,"token":%s,"param":"%s"}' %(self.token, cwd)
+				self.curPwd = self.Comm(tosend)["pwd"]
+				self.FilePrintList()
+			
+	def FileDoubleClick(self, *args):
+		if len(self.ListboxFileName.curselection()) == 1:
+			clicked = self.ListboxFileName.get(self.ListboxFileName.curselection()[0])
+			if clicked.endswith("/"):
+				self.FileCwd()
+			else:
+				self.FileDownload()
+
+
 	def FileDelete(self, *args):
 		try:
 			FilesToProcess = [self.ListboxFileName.get(idx) for idx in self.ListboxFileName.curselection()]
 			FilesToProcessStr = "\n".join(FilesToProcess)
 
 			if tkMessageBox.askyesno("Delete file", "Are you sure you want to DELETE\n\n%s\n\nThis action can't be undone!" %FilesToProcessStr):
-				tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM\/%s"}' %(self.token, self.MediaDir) #make sure we are still in the correct path
-				self.Comm(tosend)
+				if self.ExpertMode == "":
+					tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM\/%s"}' %(self.token, self.MediaDir) #make sure we are still in the correct path
+					self.Comm(tosend)
 				for FileTP in FilesToProcess:
 					self.FileProgress.config(text="Deleting %s" %FileTP, bg=self.defaultbg)
 					tosend = '{"msg_id":1281,"token":%s,"param":"%s"}' %(self.token, FileTP)
-					self.Comm(tosend)
 					self.FileProgress.config(text="Deleted", bg=self.defaultbg)
+			self.FileProgress.config(text="Deleted")
 		except Exception:
-			self.FileProgress.config(text="No file selected!", bg="#ffdddd")
+			self.FileProgress.config(text="File deleting failed!", bg="#ffdddd")
 		self.UpdateUsage()
-		self.FileManager("Deleted")
+		self.FilePrintList()
 	
-	def FileManager(self, FileProgressStr="Select a file"):
-		self.master.geometry("445x550+300+75")
-		self.ActualAction = "FileManager"
-		FileListing = {}
-		try:
-			self.content.destroy()
-		except Exception:
-			pass
-		self.content = Frame(self.mainwindow)
-		tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM"}' %self.token #lets seth initial path in camera
-		self.Comm(tosend)
-		tosend = '{"msg_id":1282,"token":%s, "param":" -D -S"}' %self.token
-		resp = self.Comm(tosend)
-		if len(resp["listing"]) > 0:
-			self.MediaDir = resp["listing"][0].keys()[0]
-			tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM\/%s"}' %(self.token, self.MediaDir) #lets seth final path in camera
-			self.Comm(tosend)
-		
-			tosend = '{"msg_id":1282,"token":%s, "param":" -D -S"}' %self.token
-			for each in self.Comm(tosend)["listing"]: FileListing.update(each)
+	def FileCreateList(self):
+		self.filelist = Frame(self.content, bg="#ffffff")
+		self.LabelFileHead = LabelFrame(self.filelist, bd=1, relief=SUNKEN, text="", width=760)
+		self.LabelFileHead.pack(side=TOP, fill=X)
+		self.LabelFileName = Label(self.LabelFileHead, width=14, bd=1, relief=RIDGE, text="Type", anchor=CENTER)
+		self.LabelFileName.grid(column=0, row=0)
+		self.LabelFileName = Label(self.LabelFileHead, width=35, bd=1, relief=RIDGE, text="Filename", anchor=CENTER)
+		self.LabelFileName.grid(column=1, row=0)
+		self.LabelFileSize = Label(self.LabelFileHead, width=12, bd=1, relief=RIDGE, text="Size", anchor=CENTER)
+		self.LabelFileSize.grid(column=2, row=0)
+		self.LabelFileDate = Label(self.LabelFileHead, width=30, bd=1, relief=RIDGE, text="DateTime ▼", anchor=CENTER)
+		self.LabelFileDate.grid(column=3, row=0)        	
 
-		if len(FileListing) == 0 :
-			self.LabelNoFiles = Label(self.content, width=30, pady=10, text="No files found", bg="#ffcccc")
-			self.LabelNoFiles.pack(side=TOP,fill=X)
+		self.FilesScrollbar = Scrollbar(self.filelist, orient=VERTICAL)
+		self.ListboxFileType = Listbox(self.filelist, yscrollcommand=self.FilesScrollbar.set, height=8, width=12, bd=0, bg="#ffffff", fg="#000000", activestyle=NONE, highlightcolor="#ffffff", highlightthickness=0, selectborderwidth=0, selectbackground="#ffffff", selectforeground="#000000")
+		self.ListboxFileName = Listbox(self.filelist, yscrollcommand=self.FilesScrollbar.set, selectmode=EXTENDED, height=27, width=37, bd=0, bg="#ffffff", fg="#000000", highlightcolor="#ffffff", highlightthickness=0)
+		self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
+		self.ListboxFileSize = Listbox(self.filelist, yscrollcommand=self.FilesScrollbar.set, height=8, width=12, bd=0, bg="#ffffff", fg="#000000", activestyle=NONE, highlightcolor="#ffffff", highlightthickness=0, selectborderwidth=0, selectbackground="#ffffff", selectforeground="#000000")
+		self.ListboxFileDate = Listbox(self.filelist, yscrollcommand=self.FilesScrollbar.set, height=8, width=30, bd=0, bg="#ffffff", fg="#000000", activestyle=NONE, highlightcolor="#ffffff", highlightthickness=0, selectborderwidth=0, selectbackground="#ffffff", selectforeground="#000000")
+		self.FilesScrollbar.config(command=self.FileYScroll)
+		self.FilesScrollbar.pack(side=RIGHT, fill=Y)
+		self.ListboxFileType.pack(side=LEFT, padx=10, fill=BOTH, expand=0)
+		self.ListboxFileName.pack(side=LEFT, padx=15, fill=BOTH, expand=0)
+		self.ListboxFileSize.pack(side=LEFT, padx=15, fill=BOTH, expand=0)
+		self.ListboxFileDate.pack(side=LEFT, padx=15, fill=BOTH, expand=0)
+		self.filelist.pack(side=TOP, fill=X)
+
+	def FilePrintList(self):
+		FileListing = {}
+		DirListing = {}
+		self.ListboxFileType.delete(0, END)
+		self.ListboxFileName.delete(0, END)
+		self.ListboxFileSize.delete(0, END)
+		self.ListboxFileDate.delete(0, END)
+		tosend = '{"msg_id":1282,"token":%s, "param":" -D -S"}' %self.token
+		for each in self.Comm(tosend)["listing"]:
+			if not each.keys()[0].endswith("/"):
+				FileListing.update(each)
+			else:
+				DirListing.update(each)
+
+		if len(FileListing) == 0 and self.ExpertMode == "":
+			self.ListboxFileType.insert(END, "")
+			self.ListboxFileName.insert(END, "")
+			self.ListboxFileSize.insert(END, "")
+			self.ListboxFileDate.insert(END, "")
 		else:
 			CamFiles=[]
+			if self.curPwd != "/":
+				CamDirs = [["../",""]]
+			else:
+				CamDirs = []
+			for dirname in DirListing.keys():
+				dirdate = re.findall(' bytes\|(.+)',DirListing[dirname])[0]
+				CamDirs.append([dirname, dirdate])
+
 			for filename in FileListing.keys():
+				filetype = "File"
+				for ThisFileType in self.FileTypes.keys():
+					if filename.lower().endswith(ThisFileType):
+						filetype = self.FileTypes[ThisFileType]
+
 				filesize, filedate = re.findall('(.+) bytes\|(.+)',FileListing[filename])[0]
 				filesize = float(filesize)
 				filepre = 0
@@ -790,40 +944,49 @@ class App:
 						filepre += 1
 					else:
 						break
-				CamFiles.append([filename,filesize,filepre,filedate])
+				CamFiles.append([filetype, filename,filesize,filepre,filedate])
 			pres = ["B", "kB", "MB", "GB", "TB"]
-			self.filelist = Frame(self.content, bg="#ffffff")
-			self.LabelFileHead = LabelFrame(self.filelist, bd=1, relief=SUNKEN, text="")
-			self.LabelFileHead.pack(side=TOP)
-			self.LabelFileName = Label(self.LabelFileHead, width=20, bd=1, relief=RIDGE, text="Filename", anchor=CENTER)
-			self.LabelFileName.grid(column=0, row=0)
-			self.LabelFileSize = Label(self.LabelFileHead, width=12, bd=1, relief=RIDGE, text="Size", anchor=CENTER)
-			self.LabelFileSize.grid(column=1, row=0)
-			self.LabelFileDate = Label(self.LabelFileHead, width=30, bd=1, relief=RIDGE, text="DateTime ▼", anchor=CENTER)
-			self.LabelFileDate.grid(column=2, row=0)        	
-
-			self.FilesScrollbar = Scrollbar(self.filelist, orient=VERTICAL)
-			self.ListboxFileName = Listbox(self.filelist, yscrollcommand=self.FilesScrollbar.set, selectmode=EXTENDED, height=27, width=20, bd=0, bg="#ffffff", fg="#000000", highlightcolor="#ffffff", highlightthickness=0)
-			self.ListboxFileSize = Listbox(self.filelist, yscrollcommand=self.FilesScrollbar.set, height=8, width=12, bd=0, bg="#ffffff", fg="#000000", activestyle=NONE, highlightcolor="#ffffff", highlightthickness=0, selectborderwidth=0, selectbackground="#ffffff", selectforeground="#000000")
-			self.ListboxFileDate = Listbox(self.filelist, yscrollcommand=self.FilesScrollbar.set, height=8, width=30, bd=0, bg="#ffffff", fg="#000000", activestyle=NONE, highlightcolor="#ffffff", highlightthickness=0, selectborderwidth=0, selectbackground="#ffffff", selectforeground="#000000")
-			self.FilesScrollbar.config(command=self.FileYScroll)
-			self.FilesScrollbar.pack(side=RIGHT, fill=Y)
-			self.ListboxFileName.pack(side=LEFT, padx=15, fill=BOTH, expand=0)
-			self.ListboxFileSize.pack(side=LEFT, padx=15, fill=BOTH, expand=0)
-			self.ListboxFileDate.pack(side=LEFT, padx=15, fill=BOTH, expand=0)
-			for ThisCamFile in sorted(CamFiles, key=itemgetter(3)):
-				self.ListboxFileName.insert(END, ThisCamFile[0])
-				self.ListboxFileSize.insert(END, " %.1f%s" %(ThisCamFile[1], pres[ThisCamFile[2]]))
-				self.ListboxFileDate.insert(END, ThisCamFile[3])
-			self.filelist.pack(side=TOP, fill=X)
-			self.FileButtonDownload = Button(self.content, text="Download", width=7, command=self.FileDownload)
-			self.FileButtonDownload.pack(side=LEFT, padx=10, ipadx=5, pady=5)
-			self.FileButtonDelete = Button(self.content, text="DELETE", width=7, bg="#ff6666", command=self.FileDelete)
-			self.FileButtonDelete.pack(side=LEFT, padx=10, ipadx=5, pady=5)
-			self.FileProgress = Label(self.content, width=40, anchor=W, bd=1, relief=SUNKEN, text=FileProgressStr, bg=self.defaultbg)
-			self.FileProgress.pack(side=RIGHT, fill=X, padx=10)
+			if self.ExpertMode != "":
+				for ThisCamDir in sorted(CamDirs):
+					self.ListboxFileType.insert(END, "Folder")
+					self.ListboxFileName.insert(END, ThisCamDir[0])
+					self.ListboxFileSize.insert(END, "")
+					self.ListboxFileDate.insert(END, ThisCamDir[1])
 			
+			for ThisCamFile in sorted(CamFiles, key=itemgetter(4)):
+				self.ListboxFileType.insert(END, ThisCamFile[0])
+				self.ListboxFileName.insert(END, ThisCamFile[1])
+				self.ListboxFileSize.insert(END, " %.1f%s" %(ThisCamFile[2], pres[ThisCamFile[3]]))
+				self.ListboxFileDate.insert(END, ThisCamFile[4])
 
+	def FileManager(self):
+		self.master.geometry("760x550+300+75")
+		self.ActualAction = "FileManager"
+		try:
+			self.content.destroy()
+		except Exception:
+			pass
+		self.content = Frame(self.mainwindow)
+		tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM"}' %self.token #lets seth initial path in camera
+		self.curPwd = self.Comm(tosend)["pwd"]
+		tosend = '{"msg_id":1282,"token":%s, "param":" -D -S"}' %self.token
+		resp = self.Comm(tosend)
+		if len(resp["listing"]) > 0:
+			self.MediaDir = resp["listing"][0].keys()[0]
+		if self.MediaDir != "":
+			tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM\/%s"}' %(self.token, self.MediaDir) #lets seth final path in camera
+			self.curPwd = self.Comm(tosend)["pwd"]
+		self.FileCreateList()
+		self.FilePrintList()
+		self.FileButtonDownload = Button(self.content, text="Download", width=8, command=self.FileDownload)
+		self.FileButtonDownload.pack(side=LEFT, padx=5, pady=5)
+		if self.ExpertMode != "":
+			self.FileButtonDelete = Button(self.content, text="Change folder", width=11, bg="#ffff66", command=self.FileCwd)
+			self.FileButtonDelete.pack(side=LEFT, padx=5, pady=5)
+		self.FileButtonDelete = Button(self.content, text="DELETE", width=6, bg="#ff6666", command=self.FileDelete)
+		self.FileButtonDelete.pack(side=LEFT, padx=5, pady=5)
+		self.FileProgress = Label(self.content, width=45, anchor=W, bd=1, relief=SUNKEN, text="Select a file", bg=self.defaultbg)
+		self.FileProgress.pack(side=RIGHT, fill=X, padx=10)
 		self.content.pack(side=TOP, fill=X)
 
 
