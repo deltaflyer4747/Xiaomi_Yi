@@ -79,12 +79,12 @@ class App:
 					if pname in ("camaddr", "camauto", "camport", "camdataport", "camwebport", "custom_vlc_path", "ExpertMode"): setattr(self, pname, pvalue)
 				if not {"camaddr", "camauto", "camport", "camdataport", "camwebport", "custom_vlc_path"} <= set(ConfigFile.keys()): raise
 			except Exception: #no settings file yet, lets create default one & set defaults
-				print set(ConfigFile.keys())
 				filek = open("settings.cfg","w")
 				ConfigFile = '{"camaddr":"192.168.42.1","camauto":"","camport":7878,"camdataport":8787,"camwebport":80,"custom_vlc_path":"."}'
 				filek.write(ConfigFile) 
 				filek.close()
 				self.camaddr = "192.168.42.1"
+				self.camauto = ""
 				self.camport = 7878
 				self.camdataport = 8787
 				self.camwebport = 80
