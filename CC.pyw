@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.5.1"
+AppVersion = "0.5.2"
 
 import base64, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -763,18 +763,30 @@ class App:
 	def FileDownReport(self, bytes_so_far, chunk_size, total_size, FileTP):
 		percent = float(bytes_so_far) / total_size
 		percent = round(percent*100, 2)
-		self.FileProgress.config(text="Downloading %s (%0.2f%%)" %(FileTP, percent), bg=self.defaultbg)
+		thistime = time.time()
+		if thistime - self.FileTime > 0.01:
+			ActualSpeed = float(chunk_size/(thistime-self.FileTime))
+			self.FileTime = thistime
+			pre = 0
+			while ActualSpeed > float(1024):
+				ActualSpeed = ActualSpeed / float(1024)
+				pre += 1
+	
+			pres = ["B", "kB", "MB", "GB", "TB"]
+			FileSpeed = "%0.2f %s" %(ActualSpeed, pres[pre]) 
+			self.FileProgress.config(text="Downloading %s at %s (%0.2f%%)" %(FileTP, FileSpeed, percent), bg=self.defaultbg)
 
 		if bytes_so_far >= total_size:
 			self.FileProgress.config(text="%s downloaded" %(FileTP), bg="#ddffdd")
 
-	def FileDownChunk(self, response, chunk_size=8192, report_hook=None, FileTP=""):
+	def FileDownChunk(self, response, chunk_size=16384, report_hook=None, FileTP=""):
 		total_size = response.info().getheader('Content-Length').strip()
 		total_size = int(total_size)
 		bytes_so_far = 0
 		
 		ThisFileName = "Files/%s" %FileTP
 		filek = open(ThisFileName, "wb")
+		self.FileTime = time.time()
 		while 1:
 			chunk = response.read(chunk_size)
 			bytes_so_far += len(chunk)
@@ -783,13 +795,14 @@ class App:
 				break
 			filek.write(chunk)
 			if report_hook:
-				self.FileDownReport(bytes_so_far, chunk_size, total_size, FileTP)
+				report_hook(bytes_so_far, chunk_size, total_size, FileTP)
 		filek.close()
 
 		return bytes_so_far
 	
 
 	def FileDownloadThread(self):
+		time.sleep(1)
 		try:
 			FilesToProcess = [self.ListboxFileName.get(idx) for idx in self.ListboxFileName.curselection()]
 			if not os.path.isdir("Files"):
@@ -802,11 +815,15 @@ class App:
 						self.FileDownChunk(response, report_hook=self.FileDownReport, FileTP=FileTP)
 					except Exception:
 						pass
+				else:
+					self.FileProgress.config(text="You cannot download a folder!", bg="#ffdddd")
 			self.MainButtonControl.config(state="normal")
 			self.MainButtonConfigure.config(state="normal")
 			self.MainButtonFiles.config(state="normal")
 			self.FileButtonDownload.config(state="normal")
 			self.FileButtonDelete.config(state="normal")
+			if self.ExpertMode:
+				self.FileButtonCwd.config(state="normal")
 			self.Cameramenu.entryconfig(1, state="normal")
 			self.Cameramenu.entryconfig(2, state="normal")
 			self.Cameramenu.entryconfig(3, state="normal")
@@ -817,6 +834,8 @@ class App:
 			self.MainButtonConfigure.config(state="normal")
 			self.MainButtonFiles.config(state="normal")
 			self.FileButtonDownload.config(state="normal")
+			if self.ExpertMode:
+				self.FileButtonCwd.config(state="normal")
 			self.FileButtonDelete.config(state="normal")
 			self.Cameramenu.entryconfig(1, state="normal")
 			self.Cameramenu.entryconfig(2, state="normal")
@@ -829,6 +848,8 @@ class App:
 		self.MainButtonFiles.config(state=DISABLED)
 		self.FileButtonDownload.config(state=DISABLED)
 		self.FileButtonDelete.config(state=DISABLED)
+		if self.ExpertMode:
+			self.FileButtonCwd.config(state=DISABLED)
 		self.Cameramenu.entryconfig(1, state=DISABLED)
 		self.Cameramenu.entryconfig(2, state=DISABLED)
 		self.Cameramenu.entryconfig(3, state=DISABLED)
@@ -981,8 +1002,8 @@ class App:
 		self.FileButtonDownload = Button(self.content, text="Download", width=8, command=self.FileDownload)
 		self.FileButtonDownload.pack(side=LEFT, padx=5, pady=5)
 		if self.ExpertMode != "":
-			self.FileButtonDelete = Button(self.content, text="Change folder", width=11, bg="#ffff66", command=self.FileCwd)
-			self.FileButtonDelete.pack(side=LEFT, padx=5, pady=5)
+			self.FileButtonCwd = Button(self.content, text="Change folder", width=11, bg="#ffff66", command=self.FileCwd)
+			self.FileButtonCwd.pack(side=LEFT, padx=5, pady=5)
 		self.FileButtonDelete = Button(self.content, text="DELETE", width=6, bg="#ff6666", command=self.FileDelete)
 		self.FileButtonDelete.pack(side=LEFT, padx=5, pady=5)
 		self.FileProgress = Label(self.content, width=45, anchor=W, bd=1, relief=SUNKEN, text="Select a file", bg=self.defaultbg)
