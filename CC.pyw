@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.5.2"
+AppVersion = "0.5.3"
 
 import base64, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -242,16 +242,36 @@ class App:
 			self.camconn.destroy() #hide connection selection
 			self.UpdateUsage()
 			self.UpdateBattery()
-			self.Cameramenu.entryconfig(0, state="normal")
-			self.Cameramenu.entryconfig(1, state="normal")
-			self.Cameramenu.entryconfig(2, state="normal")
-			self.Cameramenu.entryconfig(3, state="normal")
-			if self.ExpertMode == "":
-				self.Cameramenu.entryconfig(4, state="normal")
+			self.ReadConfig()
+			if self.camconfig["sd_card_status"] == "insert" and self.totalspace > 0:
+				if self.camconfig["sdcard_need_format"] != "no-need":
+					if self.ActionForceFormat():
+						self.Cameramenu.entryconfig(0, state="normal")
+						self.Cameramenu.entryconfig(1, state="normal")
+						self.Cameramenu.entryconfig(2, state="normal")
+						self.Cameramenu.entryconfig(3, state="normal")
+						if self.ExpertMode == "":
+							self.Cameramenu.entryconfig(4, state="normal")
+						else:
+							self.ShowExpertMenu()
+						self.MainWindow()
+					else:
+						l = Label(self.master, width=40, text="SD memory card not formatted!\n\nPlease insert formatted SD card or format this one\n\nand restart C&C.", anchor=CENTER)
+						l.pack(side=TOP, fill=BOTH)
+				else:
+					self.Cameramenu.entryconfig(0, state="normal")
+					self.Cameramenu.entryconfig(1, state="normal")
+					self.Cameramenu.entryconfig(2, state="normal")
+					self.Cameramenu.entryconfig(3, state="normal")
+					if self.ExpertMode == "":
+						self.Cameramenu.entryconfig(4, state="normal")
+					else:
+						self.ShowExpertMenu()
+					self.MainWindow()
 			else:
-				self.ShowExpertMenu()
-			
-			self.MainWindow()
+				l = Label(self.master, width=40, text="No SD memory card inserted in camera!\n\nPlease power off camera, insert SD & restart C&C.", anchor=CENTER)
+				l.pack(side=TOP, fill=BOTH)
+
 
 		except Exception:
 			self.connected = False
@@ -337,26 +357,26 @@ class App:
 
 	def UpdateUsage(self):
 		tosend = '{"msg_id":5,"token":%s,"type":"total"}' %self.token
-		totalspace = self.Comm(tosend)["param"]
+		self.totalspace = self.Comm(tosend)["param"]
 		tosend = '{"msg_id":5,"token":%s,"type":"free"}' %self.token
-		freespace = float(self.Comm(tosend)["param"])
-		usedspace = totalspace-freespace
-		totalpre = 0
-		usedpre = 0
+		self.freespace = float(self.Comm(tosend)["param"])
+		self.usedspace = self.totalspace-self.freespace
+		self.totalpre = 0
+		self.usedpre = 0
 		while 1:
-			if usedspace > 1024:
-				usedspace = usedspace/float(1024)
-				usedpre += 1
+			if self.usedspace > 1024:
+				self.usedspace = self.usedspace/float(1024)
+				self.usedpre += 1
 			else:
 				break
 		while 1:
-			if totalspace > 1024:
-				totalspace = totalspace/float(1024)
-				totalpre += 1
+			if self.totalspace > 1024:
+				self.totalspace = self.totalspace/float(1024)
+				self.totalpre += 1
 			else:
 				break
 		pres = ["kB", "MB", "GB", "TB"]
-		usage = "Used %.1f%s of %.1f%s" %(usedspace, pres[usedpre], totalspace, pres[totalpre])
+		usage = "Used %.1f%s of %.1f%s" %(self.usedspace, pres[self.usedpre], self.totalspace, pres[self.totalpre])
 		self.usage.config(text=usage) #display usage message in statusbar
 		self.usage.update_idletasks()
 	
@@ -502,6 +522,15 @@ class App:
 	def ActionInfo(self):
 		tkMessageBox.showinfo("Camera information", "SW ver: %s\nHW ver: %s\nSN: %s" %(self.camconfig["sw_version"], self.camconfig["hw_version"], self.camconfig["serial_number"]))
 		self.UpdateUsage()
+
+
+	def ActionForceFormat(self):
+		if tkMessageBox.askyesno("Format memory card", "Memory card is not formatted\nFORMAT MEMORY CARD NOW?\n\nThis action can't be undone\nALL PHOTOS & VIDEOS WILL BE LOST!"):
+			tosend = '{"msg_id":4,"token":%s}' %self.token
+			self.Comm(tosend)
+			return(True)
+		else:
+			return(False)
 
 	def ActionFormat(self):
 		if tkMessageBox.askyesno("Format memory card", "Are you sure you want to\nFORMAT MEMORY CARD?\n\nThis action can't be undone\nALL PHOTOS & VIDEOS WILL BE LOST!"):
