@@ -3,9 +3,9 @@
 #
 # Res andy
 
-AppVersion = "0.5.3"
+AppVersion = "0.5.4"
 
-import base64, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
+import base64, functools, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
 from operator import itemgetter
 
@@ -20,6 +20,7 @@ class App:
 		self.JsonData = {}
 		self.MediaDir = ""
 		self.ExpertMode = ""
+		self.DefaultChunkSize = 8192
 		
 		self.DonateUrl = "http://sw.deltaflyer.cz/donate.html"
 		self.GitUrl = "https://github.com/deltaflyer4747/Xiaomi_Yi"
@@ -28,6 +29,7 @@ class App:
 		self.ConfigTypes = {"auto_low_light":"checkbutton", "auto_power_off":"optionmenu", "burst_capture_number":"optionmenu", "buzzer_ring":"checkbutton", "buzzer_volume":"optionmenu", "camera_clock":"button", "capture_default_mode":"optionmenu", "emergency_file_backup":"checkbutton", "led_mode":"optionmenu", "loop_record":"checkbutton", "meter_mode":"optionmenu", "osd_enable":"checkbutton", "photo_quality":"optionmenu", "photo_size":"optionmenu", "photo_stamp":"optionmenu", "precise_cont_time":"optionmenu", "precise_selftime":"optionmenu", "preview_status":"checkbutton", "start_wifi_while_booted":"checkbutton", "system_default_mode":"radiobutton", "system_mode":"radiobutton", "timelapse_photo":"radiobutton", "timelapse_video":"radiobutton", "video_output_dev_type":"optionmenu", "video_quality":"optionmenu", "video_resolution":"optionmenu","video_rotate":"checkbutton", "video_stamp":"optionmenu", "video_standard":"radiobutton", "warp_enable":"checkbutton", "wifi_ssid":"entry", "wifi_password":"entry"}
 		self.ConfigIgnores = ["dev_reboot", "restore_factory_settings", "capture_mode", "precise_self_running"]
 		self.FileTypes = {"/":"Folder", ".bmp":"Image", ".ico":"Image", ".jpg":"Image", ".mka":"Audio", ".mkv":"Video", "mp3":"Audio", ".mp4":"Video", ".mpg":"Video", ".png":"Image", ".txt":"Text", "wav":"Audio"}
+		self.ChunkSizes = [0.5,1,2,4,8,16,32,64,128,256]
 		self.master = master
 		self.master.geometry("445x250+300+75")
 		self.master.wm_title("Xiaomi Yi C&C by Andy_S | ver %s" %AppVersion)
@@ -64,7 +66,9 @@ class App:
 		self.helpmenu.add_command(label="About...", command=self.AboutProg, underline=0)
 		self.UpdateCheck()
 		self.ConnWindow()		
-				
+
+	def noaction(self, *args):
+		return				
 
 	def Settings(self, add="", rem=""):
 		if add == "" and rem == "": #nothing to add or remove = initial call
@@ -76,18 +80,17 @@ class App:
 				
 				for pname in ConfigFile.keys():
 					pvalue = ConfigFile[pname]
-					if pname in ("camaddr", "camauto", "camport", "camdataport", "camwebport", "custom_vlc_path", "ExpertMode"): setattr(self, pname, pvalue)
-				if not {"camaddr", "camauto", "camport", "camdataport", "camwebport", "custom_vlc_path"} <= set(ConfigFile.keys()): raise
+					if pname in ("camaddr", "camauto", "camport", "camdataport", "custom_vlc_path", "DefaultChunkSize", "ExpertMode"): setattr(self, pname, pvalue)
+				if not {"camaddr", "camauto", "camport", "camdataport", "custom_vlc_path"} <= set(ConfigFile.keys()): raise
 			except Exception: #no settings file yet, lets create default one & set defaults
 				filek = open("settings.cfg","w")
-				ConfigFile = '{"camaddr":"192.168.42.1","camauto":"","camport":7878,"camdataport":8787,"camwebport":80,"custom_vlc_path":"."}'
+				ConfigFile = '{"camaddr":"192.168.42.1","camauto":"","camport":7878,"camdataport":8787,"custom_vlc_path":"."}'
 				filek.write(ConfigFile) 
 				filek.close()
 				self.camaddr = "192.168.42.1"
 				self.camauto = ""
 				self.camport = 7878
 				self.camdataport = 8787
-				self.camwebport = 80
 				self.custom_vlc_path = "."
 		else:
 			if len(add)>0:
@@ -117,7 +120,6 @@ class App:
 		self.addrv3 = StringVar()
 		self.addrv4 = StringVar()
 		self.addrv5 = StringVar()
-		self.addrv6 = StringVar()
 		b = Button(self.camconn, text="Connect C&C", width=11, command=self.CamConnect)
 		b.focus_set()
 		b.grid(row=1, column=1, padx=10, pady=2)
@@ -131,7 +133,7 @@ class App:
 		e1.grid(row=1, column=3)
 		l = Label(self.camconn, width=12, text="Own VLC Path:", anchor=E)
 		l.grid(row=2, column=2)
-		e5 = Entry(self.camconn, textvariable=self.addrv6, width=20)
+		e5 = Entry(self.camconn, textvariable=self.addrv5, width=20)
 		e5.grid(row=2, column=3)
 		l = Label(self.camconn, width=17, text="*default path = .", anchor=W)
 		l.grid(row=3, column=3, pady=3)
@@ -144,21 +146,26 @@ class App:
 		l.grid(row=2, column=4)
 		e3 = Entry(self.camconn, textvariable=self.addrv4, width=4)
 		e3.grid(row=2, column=5)
-		l = Label(self.camconn, width=10, text="Web Port:", anchor=E)
-		l.grid(row=3, column=4)
-		e4 = Entry(self.camconn, textvariable=self.addrv5, width=4)
-		e4.grid(row=3, column=5)
 		self.addrv1.set(self.camaddr)
 		self.addrv2.set(self.camport)
 		self.addrv3.set(self.camauto)
 		self.addrv4.set(self.camdataport)
-		self.addrv5.set(self.camwebport)
-		self.addrv6.set(self.custom_vlc_path)
+		self.addrv5.set(self.custom_vlc_path)
 		self.camconn.pack(side=TOP, fill=X)
 		if self.camauto == "on":
 			self.CamConnect()
 
-
+	def GetPres(self, Value, option=0):
+		Value = float(Value)
+		fileName = ""
+		while 1:
+			if Value > 1024:
+				Value = Value/float(1024)
+				option += 1
+			else:
+				break
+		pres = ["B", "KB", "MB", "GB", "TB"]
+		return("%.1f%s" %(Value, pres[option]))
 
 	def UpdateCheck(self):
 		try:
@@ -216,8 +223,7 @@ class App:
 			self.camport = int(self.addrv2.get()) #read port from inputbox & convert to integer
 			self.camauto = self.addrv3.get() #read autoconnect status
 			self.camdataport = int(self.addrv4.get()) #read data port from inputbox & convert to integer
-			self.camwebport = int(self.addrv5.get()) #read web port from inputbox & convert to integer
-			self.custom_vlc_path = self.addrv6.get() #read custom_vlc_path
+			self.custom_vlc_path = self.addrv5.get() #read custom_vlc_path
 			socket.setdefaulttimeout(5)
 			self.srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create socket
 			self.srv.connect((self.camaddr, self.camport)) #open socket
@@ -235,7 +241,7 @@ class App:
 					continue
 				else:
 					raise Exception('Connection', 'failed') #throw an exception
-			ToWrite = {"camaddr":self.camaddr, "camauto":self.camauto, "camport":self.camport, "camdataport":self.camdataport, "camwebport": self.camwebport, "custom_vlc_path":self.custom_vlc_path}
+			ToWrite = {"camaddr":self.camaddr, "camauto":self.camauto, "camport":self.camport, "camdataport":self.camdataport, "custom_vlc_path":self.custom_vlc_path}
 			self.Settings(add=ToWrite)
 			self.status.config(text="Connected") #display status message in statusbar
 			self.status.update_idletasks()
@@ -399,10 +405,28 @@ class App:
 		self.menu.add_cascade(label="ExpertMenu", menu=self.Expertmenu, underline=0)
 		self.Expertmenu.add_command(label="Show all camera variables", command=self.ExpertVariables, underline=0)
 		self.Expertmenu.add_command(label="Enable Telnet access", command=self.ExpertTelnet, underline=0)
+		self.ExpertmenuChunkSize = Menu(self.menu, tearoff=0)
+		self.Expertmenu.add_cascade(label="File transfer chunk size", menu=self.ExpertmenuChunkSize, underline=0)
+		self.ShowExpertChunkMenu()
 		self.Expertmenu.add_command(label="Activate camera jetpack", command=self.ActionInfo, state=DISABLED, underline=0)
 		self.Expertmenu.add_command(label="Explode camera", command=self.ActionInfo, state=DISABLED, underline=0)
 		self.Expertmenu.add_command(label="Kill ALL puppies", command=self.ActionInfo, state=DISABLED, underline=0)
 		
+	def ShowExpertChunkMenu(self):
+		self.ExpertmenuChunkSize.delete(0,END)
+		for thislabel in sorted(self.ChunkSizes):
+			if self.DefaultChunkSize == thislabel*1024:
+				selected = " ✓"
+			else:
+				selected = "  "
+			self.ExpertmenuChunkSize.add_command(label="%skB%s" %(thislabel,selected), command=functools.partial(self.ExpertChunkChange,thislabel*1024))
+
+
+	def ExpertChunkChange(self, NewChunkSize):
+		self.DefaultChunkSize = int(NewChunkSize)
+		self.Settings(add={"DefaultChunkSize":self.DefaultChunkSize})
+		self.ShowExpertChunkMenu()
+
 	def ExpertVariables(self):
 		toshow = ""
 		for pname in sorted(self.camconfig):
@@ -795,29 +819,36 @@ class App:
 		thistime = time.time()
 		if thistime - self.FileTime > 0.01:
 			ActualSpeed = float(chunk_size/(thistime-self.FileTime))
+			self.FileSpeed.append(ActualSpeed)
 			self.FileTime = thistime
 			pre = 0
-			while ActualSpeed > float(1024):
-				ActualSpeed = ActualSpeed / float(1024)
-				pre += 1
-	
-			pres = ["B", "kB", "MB", "GB", "TB"]
-			FileSpeed = "%0.2f %s" %(ActualSpeed, pres[pre]) 
-			self.FileProgress.config(text="Downloading %s at %s (%0.2f%%)" %(FileTP, FileSpeed, percent), bg=self.defaultbg)
+			AvgSpeed = sum(self.FileSpeed) / float(len(self.FileSpeed))
+
+			self.FileProgress.config(text="Downloading %s at %s/s (%0.2f%%)" %(FileTP, self.GetPres(Value=AvgSpeed), percent), bg=self.defaultbg)
 
 		if bytes_so_far >= total_size:
 			self.FileProgress.config(text="%s downloaded" %(FileTP), bg="#ddffdd")
 
-	def FileDownChunk(self, response, chunk_size=16384, report_hook=None, FileTP=""):
-		total_size = response.info().getheader('Content-Length').strip()
-		total_size = int(total_size)
+	def FileDownChunk(self, chunk_size=0, report_hook=None, FileTP=""):
+		if chunk_size == 0:
+			chunk_size = self.DefaultChunkSize
+		tosend = '{"msg_id":1285,"token":%s,"param":"%s", "offset":0, "fetch_size":%s}' %(self.token, FileTP, chunk_size)
+		resp = self.Comm(tosend)
+		total_size = int(resp["size"])
+		this_size = int(resp["rem_size"])
 		bytes_so_far = 0
 		
 		ThisFileName = "Files/%s" %FileTP
 		filek = open(ThisFileName, "wb")
 		self.FileTime = time.time()
+		self.FileSpeed = []
 		while 1:
-			chunk = response.read(chunk_size)
+			chunk = bytearray(this_size)
+			view = memoryview(chunk)
+			while this_size:
+				nbytes = self.Datasrv.recv_into(view, this_size)
+				view = view[nbytes:]
+				this_size -= nbytes
 			bytes_so_far += len(chunk)
 			
 			if not chunk:
@@ -825,25 +856,42 @@ class App:
 			filek.write(chunk)
 			if report_hook:
 				report_hook(bytes_so_far, chunk_size, total_size, FileTP)
+			if bytes_so_far >= total_size:
+				break
+			else:
+				tosend = '{"msg_id":1285,"token":%s,"param":"%s", "offset":%s, "fetch_size":%s}' %(self.token, FileTP, bytes_so_far, chunk_size)
+				resp = self.Comm(tosend)
+				this_size = int(resp["rem_size"])
+					
+
 		filek.close()
 
-		return bytes_so_far
 	
 
 	def FileDownloadThread(self):
-		time.sleep(1)
+		FileIds = ()
+		while FileIds == ():
+			try:
+				FileIds = self.ListboxFileName.curselection()
+			except Exception:
+				pass
 		try:
-			FilesToProcess = [self.ListboxFileName.get(idx) for idx in self.ListboxFileName.curselection()]
+			FilesToProcess = [self.ListboxFileName.get(idx) for idx in FileIds]
 			if not os.path.isdir("Files"):
 				os.mkdir("Files",0o777)
 			for FileTP in FilesToProcess:
 				if not FileTP.endswith("/"):
+					self.Datasrv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create data socket
+					self.Datasrv.connect((self.camaddr, self.camdataport)) #open data socket
+	
 					self.FileProgress.config(text="Downloading", bg=self.defaultbg)
-					response = urllib2.urlopen('http://%s:%s/DCIM/%s/%s' %(self.camaddr, self.camwebport, self.MediaDir, FileTP))
 					try:
-						self.FileDownChunk(response, report_hook=self.FileDownReport, FileTP=FileTP)
-					except Exception:
+						self.FileDownChunk(report_hook=self.FileDownReport, FileTP=FileTP)
+					except Exception as e:
+						print e
+						self.FileProgress.config(text="File download failed!", bg="#ffdddd")
 						pass
+					self.Datasrv.close()
 				else:
 					self.FileProgress.config(text="You cannot download a folder!", bg="#ffdddd")
 			self.MainButtonControl.config(state="normal")
@@ -856,6 +904,7 @@ class App:
 			self.Cameramenu.entryconfig(1, state="normal")
 			self.Cameramenu.entryconfig(2, state="normal")
 			self.Cameramenu.entryconfig(3, state="normal")
+			self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
 							
 		except Exception:
 			self.FileProgress.config(text="File download failed!", bg="#ffdddd")
@@ -869,6 +918,7 @@ class App:
 			self.Cameramenu.entryconfig(1, state="normal")
 			self.Cameramenu.entryconfig(2, state="normal")
 			self.Cameramenu.entryconfig(3, state="normal")
+			self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
 	
 
 	def FileDownload(self, *args):
@@ -882,6 +932,7 @@ class App:
 		self.Cameramenu.entryconfig(1, state=DISABLED)
 		self.Cameramenu.entryconfig(2, state=DISABLED)
 		self.Cameramenu.entryconfig(3, state=DISABLED)
+		self.ListboxFileName.bind("<Double-Button-1>", self.noaction)
 		
 		self.thread_FileDown = threading.Thread(target=self.FileDownloadThread)
 		self.thread_FileDown.start()
