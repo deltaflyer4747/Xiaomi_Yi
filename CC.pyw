@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.5.5"
+AppVersion = "0.5.6"
 
 import base64, functools, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -21,7 +21,10 @@ class App:
 		self.MediaDir = ""
 		self.ExpertMode = ""
 		self.DefaultChunkSize = 8192
-		
+		self.ZoomLevelValue = ""
+		self.ZoomLevelOldValue = ""
+		self.thread_zoom = ""
+				
 		self.DonateUrl = "http://sw.deltaflyer.cz/donate.html"
 		self.GitUrl = "https://github.com/deltaflyer4747/Xiaomi_Yi"
 		self.UpdateUrl = "https://raw.githubusercontent.com/deltaflyer4747/Xiaomi_Yi/master/version.txt"
@@ -249,34 +252,26 @@ class App:
 			self.UpdateUsage()
 			self.UpdateBattery()
 			self.ReadConfig()
+			self.SDOK = True
 			if self.camconfig["sd_card_status"] == "insert" and self.totalspace > 0:
 				if self.camconfig["sdcard_need_format"] != "no-need":
-					if self.ActionForceFormat():
-						self.Cameramenu.entryconfig(0, state="normal")
-						self.Cameramenu.entryconfig(1, state="normal")
-						self.Cameramenu.entryconfig(2, state="normal")
-						self.Cameramenu.entryconfig(3, state="normal")
-						if self.ExpertMode == "":
-							self.Cameramenu.entryconfig(4, state="normal")
-						else:
-							self.ShowExpertMenu()
-						self.MainWindow()
-					else:
-						l = Label(self.master, width=40, text="SD memory card not formatted!\n\nPlease insert formatted SD card or format this one\n\nand restart C&C.", anchor=CENTER)
-						l.pack(side=TOP, fill=BOTH)
-				else:
-					self.Cameramenu.entryconfig(0, state="normal")
-					self.Cameramenu.entryconfig(1, state="normal")
-					self.Cameramenu.entryconfig(2, state="normal")
-					self.Cameramenu.entryconfig(3, state="normal")
-					if self.ExpertMode == "":
-						self.Cameramenu.entryconfig(4, state="normal")
-					else:
-						self.ShowExpertMenu()
-					self.MainWindow()
+					if not self.ActionForceFormat():
+						self.SDOK = False
+						self.SDLabelText="SD memory card not formatted!\n\nPlease insert formatted SD card or format this one\n\nand restart C&C."
 			else:
-				l = Label(self.master, width=40, text="No SD memory card inserted in camera!\n\nPlease power off camera, insert SD & restart C&C.", anchor=CENTER)
-				l.pack(side=TOP, fill=BOTH)
+				self.SDOK = False
+				self.SDLabelText="No SD memory card inserted in camera!\n\nPlease power off camera, insert SD & restart C&C."
+
+			if self.SDOK == True:
+				self.Cameramenu.entryconfig(0, state="normal")
+				self.Cameramenu.entryconfig(1, state="normal")
+				self.Cameramenu.entryconfig(2, state="normal")
+				self.Cameramenu.entryconfig(3, state="normal")
+				if self.ExpertMode == "":
+					self.Cameramenu.entryconfig(4, state="normal")
+				else:
+					self.ShowExpertMenu()
+			self.MainWindow()
 
 
 		except Exception:
@@ -391,7 +386,7 @@ class App:
 		resp = self.Comm(tosend)
 		Ctype = resp["type"]
 		charge = resp["param"]
-
+                        	
 		if Ctype == "adapter":
 			Ctype = "Charging"
 		else:
@@ -460,15 +455,22 @@ class App:
 	def MainWindow(self):
 		self.mainwindow = Frame(self.master, width=550, height=400)
 		self.topbuttons = Frame(self.mainwindow, bg="#aaaaff")
-		self.MainButtonControl = Button(self.topbuttons, text="Control", width=7, command=self.MenuControl)
-		self.MainButtonControl.pack(side=LEFT, padx=10, ipadx=5, pady=5)
+		if self.SDOK:
+			self.MainButtonControl = Button(self.topbuttons, text="Control", width=7, command=self.MenuControl)
+			self.MainButtonControl.pack(side=LEFT, padx=10, ipadx=5, pady=5)
 		self.MainButtonConfigure = Button(self.topbuttons, text="Configure", width=7, command=self.MenuConfig)
 		self.MainButtonConfigure.pack(side=LEFT, padx=10, ipadx=5, pady=5)
-		self.MainButtonFiles = Button(self.topbuttons, text="Files", width=7, command=self.FileManager)
-		self.MainButtonFiles.pack(side=LEFT, padx=10, ipadx=5, pady=5)
+		if self.SDOK:
+			self.MainButtonFiles = Button(self.topbuttons, text="Files", width=7, command=self.FileManager)
+			self.MainButtonFiles.pack(side=LEFT, padx=10, ipadx=5, pady=5)
 		self.topbuttons.pack(side=TOP, fill=X)
 		self.mainwindow.pack(side=TOP, fill=X)
-		self.MenuControl()
+		if self.SDOK:
+			self.MenuControl()
+		else:
+			l = Label(self.mainwindow, width=40, text="No SD memory card inserted in camera!\n\nPlease power off camera, insert SD & restart C&C.", anchor=CENTER)
+			l.pack(side=TOP, fill=BOTH)
+
 	
 	def MenuControl(self):
 		self.master.geometry("475x250+300+75")
@@ -512,12 +514,22 @@ class App:
 			self.bstream = Button(self.controlbuttons, text="LIVE\nView", width=7, command=self.ActionVideoStart, bg="#ffff66")
 		self.bstream.pack(side=LEFT, padx=10, ipadx=5, pady=5)
 
-		tosend = '{"msg_id":15,"token":%s,"type":"current"}' %self.token
-		resp = self.Comm(tosend)
+		if self.ZoomLevelValue == "":
+			tosend = '{"msg_id":15,"token":%s,"type":"current"}' %self.token
+			resp = self.Comm(tosend)
+			ThisZoomLevelValue = int(resp["param"])
+		else:
+			ThisZoomLevelValue = self.ZoomLevelValue
+
+		if self.thread_zoom == "":
+			self.thread_zoom = threading.Thread(target=self.ActionZoomChangeThread)
+			self.thread_zoom.start()
+
+
 		
 		self.ZoomLevelFrame = Frame(self.controlbuttons, width=50)
 		self.ZoomLevel = Scale(self.ZoomLevelFrame, from_=0, to=100, orient=HORIZONTAL, width=10, length=150, command=self.ActionZoomChange)
-		self.ZoomLevel.set(int(resp["param"]))
+		self.ZoomLevel.set(ThisZoomLevelValue)
 		self.ZoomLevel.pack(side=TOP)
 		Label(self.ZoomLevelFrame, width=10, text="Zoom level", anchor=W).pack(side=TOP)
 		self.ZoomLevelFrame.pack(side=TOP, fill=X, padx=5)
@@ -554,11 +566,16 @@ class App:
 			self.Cameramenu.delete(4)
 			self.ShowExpertMenu()
 
+	def ActionZoomChangeThread(self):
+		while 1:
+			if self.ZoomLevelOldValue != self.ZoomLevelValue:
+				tosend = '{"msg_id":14,"token":%s,"type":"fast","param":"%s"}' %(self.token, self.ZoomLevelValue)
+				self.Comm(tosend)
+				self.ZoomLevelOldValue = self.ZoomLevelValue
+			time.sleep(1)
 
 	def ActionZoomChange(self, *args):
 		self.ZoomLevelValue = self.ZoomLevel.get()
-		tosend = '{"msg_id":14,"token":%s,"type":"fast","param":"%s"}' %(self.token, self.ZoomLevelValue)
-		self.Comm(tosend)
 
 	def ActionInfo(self):
 		tkMessageBox.showinfo("Camera information", "SW ver: %s\nHW ver: %s\nSN: %s" %(self.camconfig["sw_version"], self.camconfig["hw_version"], self.camconfig["serial_number"]))
