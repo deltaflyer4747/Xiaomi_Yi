@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.5.4"
+AppVersion = "0.5.5"
 
 import base64, functools, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -471,7 +471,7 @@ class App:
 		self.MenuControl()
 	
 	def MenuControl(self):
-		self.master.geometry("445x250+300+75")
+		self.master.geometry("475x250+300+75")
 		self.ReadConfig()
 		try:
 			self.content.destroy()
@@ -511,7 +511,19 @@ class App:
 		else:
 			self.bstream = Button(self.controlbuttons, text="LIVE\nView", width=7, command=self.ActionVideoStart, bg="#ffff66")
 		self.bstream.pack(side=LEFT, padx=10, ipadx=5, pady=5)
+
+		tosend = '{"msg_id":15,"token":%s,"type":"current"}' %self.token
+		resp = self.Comm(tosend)
+		
+		self.ZoomLevelFrame = Frame(self.controlbuttons, width=50)
+		self.ZoomLevel = Scale(self.ZoomLevelFrame, from_=0, to=100, orient=HORIZONTAL, width=10, length=150, command=self.ActionZoomChange)
+		self.ZoomLevel.set(int(resp["param"]))
+		self.ZoomLevel.pack(side=TOP)
+		Label(self.ZoomLevelFrame, width=10, text="Zoom level", anchor=W).pack(side=TOP)
+		self.ZoomLevelFrame.pack(side=TOP, fill=X, padx=5)
+
 		self.controlbuttons.pack(side=TOP, fill=X)
+
 
 		self.FramePhotoButtonMod = Frame(self.content)
 		self.Photo_options = {"precise quality":"Single","precise quality cont.":"Timelapse","burst quality":"Burst","precise self quality":"Delayed"}
@@ -542,6 +554,11 @@ class App:
 			self.Cameramenu.delete(4)
 			self.ShowExpertMenu()
 
+
+	def ActionZoomChange(self, *args):
+		self.ZoomLevelValue = self.ZoomLevel.get()
+		tosend = '{"msg_id":14,"token":%s,"type":"fast","param":"%s"}' %(self.token, self.ZoomLevelValue)
+		self.Comm(tosend)
 
 	def ActionInfo(self):
 		tkMessageBox.showinfo("Camera information", "SW ver: %s\nHW ver: %s\nSN: %s" %(self.camconfig["sw_version"], self.camconfig["hw_version"], self.camconfig["serial_number"]))
@@ -967,9 +984,11 @@ class App:
 				for FileTP in FilesToProcess:
 					self.FileProgress.config(text="Deleting %s" %FileTP, bg=self.defaultbg)
 					tosend = '{"msg_id":1281,"token":%s,"param":"%s"}' %(self.token, FileTP)
+					self.Comm(tosend)
 					self.FileProgress.config(text="Deleted", bg=self.defaultbg)
 			self.FileProgress.config(text="Deleted")
-		except Exception:
+		except Exception as e:
+			print e
 			self.FileProgress.config(text="File deleting failed!", bg="#ffdddd")
 		self.UpdateUsage()
 		self.FilePrintList()
