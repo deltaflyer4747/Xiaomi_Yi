@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.5.6"
+AppVersion = "0.5.7"
 
 import base64, functools, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -36,7 +36,6 @@ class App:
 		self.master = master
 		self.master.geometry("445x250+300+75")
 		self.master.wm_title("Xiaomi Yi C&C by Andy_S | ver %s" %AppVersion)
-		
 		self.statusBlock = LabelFrame(self.master, bd=1, relief=SUNKEN, text="")
 		self.statusBlock.pack(side=BOTTOM, fill=X)
 		self.status = Label(self.statusBlock, width=28, text="Disconnected", anchor=W)
@@ -161,12 +160,9 @@ class App:
 	def GetPres(self, Value, option=0):
 		Value = float(Value)
 		fileName = ""
-		while 1:
-			if Value > 1024:
-				Value = Value/float(1024)
-				option += 1
-			else:
-				break
+		while Value > 1024:
+			Value = Value/float(1024)
+			option += 1
 		pres = ["B", "KB", "MB", "GB", "TB"]
 		return("%.1f%s" %(Value, pres[option]))
 
@@ -213,9 +209,6 @@ class App:
 		for each in resp["param"]: self.camconfig.update(each)
 			
 	
-	def quit(self):
-		sys.exit()
-
 	
 	def AboutProg(self):
 		tkMessageBox.showinfo("About", "Control&Configure | ver. %s\nCreated by Andy_S, 2015\n\nandys@deltaflyer.cz" %AppVersion)
@@ -229,6 +222,7 @@ class App:
 			self.custom_vlc_path = self.addrv5.get() #read custom_vlc_path
 			socket.setdefaulttimeout(5)
 			self.srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create socket
+			self.srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 			self.srv.connect((self.camaddr, self.camport)) #open socket
 			self.srv.setblocking(0)
 			self.connected = True
@@ -306,9 +300,9 @@ class App:
 								elif data_dec["msg_id"] == 7:
 									if "type" in data_dec.keys() and "param" in data_dec.keys():
 										if data_dec["type"] == "battery":
-											self.thread_read = threading.Thread(target=self.UpdateBattery)
-											self.thread_read.setName('UpdateBattery')
-											self.thread_read.start()
+											self.thread_Battery = threading.Thread(target=self.UpdateBattery)
+											self.thread_Battery.setName('UpdateBattery')
+											self.thread_Battery.start()
 										elif data_dec["type"] == "start_photo_capture":
 											if self.camconfig["capture_mode"] == "precise quality cont.":
 												self.bphoto.config(text="Stop\nTIMELAPSE", bg="#ff6666")
@@ -364,18 +358,12 @@ class App:
 		self.usedspace = self.totalspace-self.freespace
 		self.totalpre = 0
 		self.usedpre = 0
-		while 1:
-			if self.usedspace > 1024:
-				self.usedspace = self.usedspace/float(1024)
-				self.usedpre += 1
-			else:
-				break
-		while 1:
-			if self.totalspace > 1024:
-				self.totalspace = self.totalspace/float(1024)
-				self.totalpre += 1
-			else:
-				break
+		while self.usedspace > 1024:
+			self.usedspace = self.usedspace/float(1024)
+			self.usedpre += 1
+		while self.totalspace > 1024:
+			self.totalspace = self.totalspace/float(1024)
+			self.totalpre += 1
 		pres = ["kB", "MB", "GB", "TB"]
 		usage = "Used %.1f%s of %.1f%s" %(self.usedspace, pres[self.usedpre], self.totalspace, pres[self.totalpre])
 		self.usage.config(text=usage) #display usage message in statusbar
@@ -567,7 +555,7 @@ class App:
 			self.ShowExpertMenu()
 
 	def ActionZoomChangeThread(self):
-		while 1:
+		while self.connected:
 			if self.ZoomLevelOldValue != self.ZoomLevelValue:
 				tosend = '{"msg_id":14,"token":%s,"type":"fast","param":"%s"}' %(self.token, self.ZoomLevelValue)
 				self.Comm(tosend)
@@ -851,14 +839,16 @@ class App:
 		percent = float(bytes_so_far) / total_size
 		percent = round(percent*100, 2)
 		thistime = time.time()
-		if thistime - self.FileTime > 0.01:
+		if (thistime - self.FileTime > 0.01) and self.connected:
 			ActualSpeed = float(chunk_size/(thistime-self.FileTime))
 			self.FileSpeed.append(ActualSpeed)
 			self.FileTime = thistime
 			pre = 0
 			AvgSpeed = sum(self.FileSpeed) / float(len(self.FileSpeed))
+			
+			remaining = int((total_size-bytes_so_far) / AvgSpeed)
 
-			self.FileProgress.config(text="Downloading %s at %s/s (%0.2f%%)" %(FileTP, self.GetPres(Value=AvgSpeed), percent), bg=self.defaultbg)
+			self.FileProgress.config(text="Downloading %s at %s/s (%0.2f%%, %ss left)" %(FileTP, self.GetPres(Value=AvgSpeed), percent, remaining), bg=self.defaultbg)
 
 		if bytes_so_far >= total_size:
 			self.FileProgress.config(text="%s downloaded" %(FileTP), bg="#ddffdd")
@@ -876,11 +866,12 @@ class App:
 		filek = open(ThisFileName, "wb")
 		self.FileTime = time.time()
 		self.FileSpeed = []
-		while 1:
+		while self.connected:
 			chunk = bytearray(this_size)
 			view = memoryview(chunk)
 			while this_size:
-				nbytes = self.Datasrv.recv_into(view, this_size)
+				if self.connected:
+					nbytes = self.Datasrv.recv_into(view, this_size)
 				view = view[nbytes:]
 				this_size -= nbytes
 			bytes_so_far += len(chunk)
@@ -916,6 +907,7 @@ class App:
 			for FileTP in FilesToProcess:
 				if not FileTP.endswith("/"):
 					self.Datasrv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create data socket
+					self.Datasrv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 					self.Datasrv.connect((self.camaddr, self.camdataport)) #open data socket
 	
 					self.FileProgress.config(text="Downloading", bg=self.defaultbg)
@@ -1075,12 +1067,9 @@ class App:
 				filesize, filedate = re.findall('(.+) bytes\|(.+)',FileListing[filename])[0]
 				filesize = float(filesize)
 				filepre = 0
-				while 1:
-					if filesize > 1024:
-						filesize = filesize/float(1024)
-						filepre += 1
-					else:
-						break
+				while filesize > 1024:
+					filesize = filesize/float(1024)
+					filepre += 1
 				CamFiles.append([filetype, filename,filesize,filepre,filedate])
 			pres = ["B", "kB", "MB", "GB", "TB"]
 			if self.ExpertMode != "":
@@ -1122,9 +1111,30 @@ class App:
 			self.FileButtonCwd.pack(side=LEFT, padx=5, pady=5)
 		self.FileButtonDelete = Button(self.content, text="DELETE", width=6, bg="#ff6666", command=self.FileDelete)
 		self.FileButtonDelete.pack(side=LEFT, padx=5, pady=5)
-		self.FileProgress = Label(self.content, width=45, anchor=W, bd=1, relief=SUNKEN, text="Select a file", bg=self.defaultbg)
+		self.FileProgress = Label(self.content, width=60, anchor=W, bd=1, relief=SUNKEN, text="Select a file", bg=self.defaultbg)
 		self.FileProgress.pack(side=RIGHT, fill=X, padx=10)
 		self.content.pack(side=TOP, fill=X)
+
+
+	def quit(self):
+		self.connected = False
+		time.sleep(1)
+		try:
+			self.srv.shutdown(socket.SHUT_RDWR)
+			self.srv.close()
+		except: pass
+		try:
+			self.Datasrv.shutdown(socket.SHUT_RDWR)
+			self.Datasrv.close()
+		except: pass
+		for thread in threading.enumerate():
+			if thread.isAlive():
+				try:
+					thread._Thread__stop()
+				except:
+					pass		
+
+		sys.exit()
 
 
 	
@@ -1136,11 +1146,10 @@ if mysys == "nt":
 	_, ICON_PATH = tempfile.mkstemp()
 	with open(ICON_PATH, 'wb') as icon_file:
 		icon_file.write(ICON)
-	
 	root.iconbitmap(default=ICON_PATH)
 
 
 app = App(root)
-
+root.protocol("WM_DELETE_WINDOW", app.quit)
 root.mainloop()
 
