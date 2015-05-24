@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.5.8"
+AppVersion = "0.5.9"
  
  
 
@@ -231,16 +231,11 @@ class App:
 			self.thread_read.setName('JsonReader')
 			self.thread_read.start()
 			waiter = 0
+			self.token = ""
 			while 1:
 				if self.connected:
-					self.token = ""
-					tokentime = time.time()
-					self.srv.send('{"msg_id":257,"token":0}') #auth to the camera
-					while self.token == "":
-						if time.time()+5>tokentime:
-							continue
-						else:
-							raise Exception('Connection', 'failed') #throw an exception
+					if self.token == "":
+						break
 					ToWrite = {"camaddr":self.camaddr, "camauto":self.camauto, "camport":self.camport, "camdataport":self.camdataport, "custom_vlc_path":self.custom_vlc_path}
 					self.Settings(add=ToWrite)
 					self.status.config(text="Connected") #display status message in statusbar
@@ -290,17 +285,17 @@ class App:
 			if ready[0]:
 				byte = self.srv.recv(1)
 				if byte == "{":
-					counter += 1
-					flip = 1
+					self.Jsoncounter += 1
+					self.Jsonflip = 1
 				elif byte == "}":
-					counter -= 1
-				data += byte
+					self.Jsoncounter -= 1
+				self.Jsondata += byte
 				
-				if flip == 1 and counter == 0:
+				if self.Jsonflip == 1 and self.Jsoncounter == 0:
 					try:
-						data_dec = json.loads(data)
-						data = ""
-						flip = 0
+						data_dec = json.loads(self.Jsondata)
+						self.Jsondata = ""
+						self.Jsonflip = 0
 						if "msg_id" in data_dec.keys():
 							if data_dec["msg_id"] == 257:
 								self.token = data_dec["param"]
@@ -343,10 +338,16 @@ class App:
 
 
 	def JsonReader(self):
-		data = ""
-		counter = 0
-		flip = 0
-		self.JsonLoop()
+		self.Jsondata = ""
+		self.Jsoncounter = 0
+		self.Jsonflip = 0
+		initcounter = 0
+		self.srv.send('{"msg_id":257,"token":0}') #auth to the camera
+		while initcounter < 1000:
+			self.JsonLoop()
+			initcounter += 1
+			if len(self.JsonData) > 0:
+				break
 		if len(self.JsonData) > 0:
 			self.srv.setblocking(0)
 			self.connected = True
