@@ -3,7 +3,9 @@
 #
 # Res andy
 
-AppVersion = "0.5.7"
+AppVersion = "0.5.8"
+ 
+ 
 
 import base64, functools, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
@@ -224,114 +226,132 @@ class App:
 			self.srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create socket
 			self.srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 			self.srv.connect((self.camaddr, self.camport)) #open socket
-			self.srv.setblocking(0)
-			self.connected = True
 			self.thread_read = threading.Thread(target=self.JsonReader)
 			self.thread_read.setDaemon(True)
 			self.thread_read.setName('JsonReader')
 			self.thread_read.start()
-			self.token = ""
-			tokentime = time.time()
-			self.srv.send('{"msg_id":257,"token":0}') #auth to the camera
-			while self.token == "":
-				if time.time()+5>tokentime:
-					continue
-				else:
-					raise Exception('Connection', 'failed') #throw an exception
-			ToWrite = {"camaddr":self.camaddr, "camauto":self.camauto, "camport":self.camport, "camdataport":self.camdataport, "custom_vlc_path":self.custom_vlc_path}
-			self.Settings(add=ToWrite)
-			self.status.config(text="Connected") #display status message in statusbar
-			self.status.update_idletasks()
-			self.camconn.destroy() #hide connection selection
-			self.UpdateUsage()
-			self.UpdateBattery()
-			self.ReadConfig()
-			self.SDOK = True
-			if self.camconfig["sd_card_status"] == "insert" and self.totalspace > 0:
-				if self.camconfig["sdcard_need_format"] != "no-need":
-					if not self.ActionForceFormat():
+			waiter = 0
+			while 1:
+				if self.connected:
+					self.token = ""
+					tokentime = time.time()
+					self.srv.send('{"msg_id":257,"token":0}') #auth to the camera
+					while self.token == "":
+						if time.time()+5>tokentime:
+							continue
+						else:
+							raise Exception('Connection', 'failed') #throw an exception
+					ToWrite = {"camaddr":self.camaddr, "camauto":self.camauto, "camport":self.camport, "camdataport":self.camdataport, "custom_vlc_path":self.custom_vlc_path}
+					self.Settings(add=ToWrite)
+					self.status.config(text="Connected") #display status message in statusbar
+					self.status.update_idletasks()
+					self.camconn.destroy() #hide connection selection
+					self.UpdateUsage()
+					self.UpdateBattery()
+					self.ReadConfig()
+					self.SDOK = True
+					if self.camconfig["sd_card_status"] == "insert" and self.totalspace > 0:
+						if self.camconfig["sdcard_need_format"] != "no-need":
+							if not self.ActionForceFormat():
+								self.SDOK = False
+								self.SDLabelText="SD memory card not formatted!\n\nPlease insert formatted SD card or format this one\n\nand restart C&C."
+					else:
 						self.SDOK = False
-						self.SDLabelText="SD memory card not formatted!\n\nPlease insert formatted SD card or format this one\n\nand restart C&C."
-			else:
-				self.SDOK = False
-				self.SDLabelText="No SD memory card inserted in camera!\n\nPlease power off camera, insert SD & restart C&C."
-
-			if self.SDOK == True:
-				self.Cameramenu.entryconfig(0, state="normal")
-				self.Cameramenu.entryconfig(1, state="normal")
-				self.Cameramenu.entryconfig(2, state="normal")
-				self.Cameramenu.entryconfig(3, state="normal")
-				if self.ExpertMode == "":
-					self.Cameramenu.entryconfig(4, state="normal")
+						self.SDLabelText="No SD memory card inserted in camera!\n\nPlease power off camera, insert SD & restart C&C."
+		
+					if self.SDOK == True:
+						self.Cameramenu.entryconfig(0, state="normal")
+						self.Cameramenu.entryconfig(1, state="normal")
+						self.Cameramenu.entryconfig(2, state="normal")
+						self.Cameramenu.entryconfig(3, state="normal")
+						if self.ExpertMode == "":
+							self.Cameramenu.entryconfig(4, state="normal")
+						else:
+							self.ShowExpertMenu()
+					self.MainWindow()
+					break
 				else:
-					self.ShowExpertMenu()
-			self.MainWindow()
+					if waiter <=5:
+						time.sleep(1)
+						waiter += 1
+					else:
+						raise Exception('Connection', 'failed') #throw an exception
 
 
-		except Exception:
+		except Exception as c:
 			self.connected = False
 			tkMessageBox.showerror("Connect", "Cannot connect to the address specified")
 			self.srv.close()
 	
+
+	def JsonLoop(self):
+		try:
+			ready = select.select([self.srv], [], [])
+			if ready[0]:
+				byte = self.srv.recv(1)
+				if byte == "{":
+					counter += 1
+					flip = 1
+				elif byte == "}":
+					counter -= 1
+				data += byte
+				
+				if flip == 1 and counter == 0:
+					try:
+						data_dec = json.loads(data)
+						data = ""
+						flip = 0
+						if "msg_id" in data_dec.keys():
+							if data_dec["msg_id"] == 257:
+								self.token = data_dec["param"]
+							elif data_dec["msg_id"] == 7:
+								if "type" in data_dec.keys() and "param" in data_dec.keys():
+									if data_dec["type"] == "battery":
+										self.thread_Battery = threading.Thread(target=self.UpdateBattery)
+										self.thread_Battery.setName('UpdateBattery')
+										self.thread_Battery.start()
+									elif data_dec["type"] == "start_photo_capture":
+										if self.camconfig["capture_mode"] == "precise quality cont.":
+											self.bphoto.config(text="Stop\nTIMELAPSE", bg="#ff6666")
+											self.brecord.config(state=DISABLED) 
+											self.brecord.update_idletasks()
+											self.bphoto.update_idletasks()
+											self.thread_ReadConfig = threading.Thread(target=self.ReadConfig)
+											self.thread_ReadConfig.setDaemon(True)
+											self.thread_ReadConfig.setName('ReadConfig')
+											self.thread_ReadConfig.start()
+									elif data_dec["type"] == "precise_cont_complete":
+										if self.camconfig["capture_mode"] == "precise quality cont.":
+											self.bphoto.config(text="Start\nTIMELAPSE", bg="#66ff66")
+											self.brecord.config(state="normal") 
+											self.brecord.update_idletasks()
+											self.bphoto.update_idletasks()
+											self.thread_ReadConfig = threading.Thread(target=self.ReadConfig)
+											self.thread_ReadConfig.setDaemon(True)
+											self.thread_ReadConfig.setName('ReadConfig')
+											self.thread_ReadConfig.start()
+
+
+							self.JsonData[data_dec["msg_id"]] = data_dec
+						else:
+							raise Exception('Unknown','data')
+					except Exception:
+						print data
+		except Exception:
+			self.connected = False
+
+
+
 	def JsonReader(self):
 		data = ""
 		counter = 0
 		flip = 0
-		while self.connected:
-			try:
-				ready = select.select([self.srv], [], [])
-				if ready[0]:
-					byte = self.srv.recv(1)
-					if byte == "{":
-						counter += 1
-						flip = 1
-					elif byte == "}":
-						counter -= 1
-					data += byte
-					
-					if flip == 1 and counter == 0:
-						try:
-							data_dec = json.loads(data)
-							data = ""
-							flip = 0
-							if "msg_id" in data_dec.keys():
-								if data_dec["msg_id"] == 257:
-									self.token = data_dec["param"]
-								elif data_dec["msg_id"] == 7:
-									if "type" in data_dec.keys() and "param" in data_dec.keys():
-										if data_dec["type"] == "battery":
-											self.thread_Battery = threading.Thread(target=self.UpdateBattery)
-											self.thread_Battery.setName('UpdateBattery')
-											self.thread_Battery.start()
-										elif data_dec["type"] == "start_photo_capture":
-											if self.camconfig["capture_mode"] == "precise quality cont.":
-												self.bphoto.config(text="Stop\nTIMELAPSE", bg="#ff6666")
-												self.brecord.config(state=DISABLED) 
-												self.brecord.update_idletasks()
-												self.bphoto.update_idletasks()
-												self.thread_ReadConfig = threading.Thread(target=self.ReadConfig)
-												self.thread_ReadConfig.setDaemon(True)
-												self.thread_ReadConfig.setName('ReadConfig')
-												self.thread_ReadConfig.start()
-										elif data_dec["type"] == "precise_cont_complete":
-											if self.camconfig["capture_mode"] == "precise quality cont.":
-												self.bphoto.config(text="Start\nTIMELAPSE", bg="#66ff66")
-												self.brecord.config(state="normal") 
-												self.brecord.update_idletasks()
-												self.bphoto.update_idletasks()
-												self.thread_ReadConfig = threading.Thread(target=self.ReadConfig)
-												self.thread_ReadConfig.setDaemon(True)
-												self.thread_ReadConfig.setName('ReadConfig')
-												self.thread_ReadConfig.start()
-
-
-								self.JsonData[data_dec["msg_id"]] = data_dec
-							else:
-								raise Exception('Unknown','data')
-						except Exception:
-							print data
-			except Exception:
-				self.connected = False
+		self.JsonLoop()
+		if len(self.JsonData) > 0:
+			self.srv.setblocking(0)
+			self.connected = True
+			while self.connected:
+				self.JsonLoop()
 
 	def Comm(self, tosend):
 		Jtosend = json.loads(tosend)
@@ -925,11 +945,12 @@ class App:
 			self.MainButtonFiles.config(state="normal")
 			self.FileButtonDownload.config(state="normal")
 			self.FileButtonDelete.config(state="normal")
-			if self.ExpertMode:
-				self.FileButtonCwd.config(state="normal")
 			self.Cameramenu.entryconfig(1, state="normal")
 			self.Cameramenu.entryconfig(2, state="normal")
 			self.Cameramenu.entryconfig(3, state="normal")
+			if self.ExpertMode:
+				self.FileButtonCwd.config(state="normal")
+				self.Expertmenu.entryconfig(2, state="normal")
 			self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
 							
 		except Exception:
@@ -938,12 +959,13 @@ class App:
 			self.MainButtonConfigure.config(state="normal")
 			self.MainButtonFiles.config(state="normal")
 			self.FileButtonDownload.config(state="normal")
-			if self.ExpertMode:
-				self.FileButtonCwd.config(state="normal")
 			self.FileButtonDelete.config(state="normal")
 			self.Cameramenu.entryconfig(1, state="normal")
 			self.Cameramenu.entryconfig(2, state="normal")
 			self.Cameramenu.entryconfig(3, state="normal")
+			if self.ExpertMode:
+				self.FileButtonCwd.config(state="normal")
+				self.Expertmenu.entryconfig(2, state="normal")
 			self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
 	
 
@@ -953,11 +975,12 @@ class App:
 		self.MainButtonFiles.config(state=DISABLED)
 		self.FileButtonDownload.config(state=DISABLED)
 		self.FileButtonDelete.config(state=DISABLED)
-		if self.ExpertMode:
-			self.FileButtonCwd.config(state=DISABLED)
 		self.Cameramenu.entryconfig(1, state=DISABLED)
 		self.Cameramenu.entryconfig(2, state=DISABLED)
 		self.Cameramenu.entryconfig(3, state=DISABLED)
+		if self.ExpertMode:
+			self.FileButtonCwd.config(state=DISABLED)
+			self.Expertmenu.entryconfig(2, state=DISABLED)
 		self.ListboxFileName.bind("<Double-Button-1>", self.noaction)
 		
 		self.thread_FileDown = threading.Thread(target=self.FileDownloadThread)
