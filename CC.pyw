@@ -3,11 +3,11 @@
 #
 # Res andy
 
-AppVersion = "0.5.9"
+AppVersion = "0.6.0"
  
  
 
-import base64, functools, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkMessageBox, urllib2, webbrowser, zlib
+import base64, functools, hashlib, json, os, platform, re, select, socket, subprocess, sys, tempfile, threading, time, tkFileDialog, tkMessageBox, urllib2, webbrowser, zlib
 from Tkinter import *
 from operator import itemgetter
 
@@ -448,8 +448,7 @@ class App:
 		if tkMessageBox.askyesno("Restart Camera", "You have to reboot camera for telnet to be enabled.\n\nReboot now? (C&C will close)"):
 			tosend = '{"msg_id":2,"token":%s, "type":"dev_reboot", "param":"on"}' %self.token
 			self.srv.send(tosend)
-			time.sleep(1)
-			sys.exit()
+			self.quit()
 		else:
 			tosend = '{"msg_id":1283,"token":%s,"param":"%s"}' %(self.token, self.curPwd)
 			self.Comm(tosend)
@@ -486,6 +485,7 @@ class App:
 		self.ReadConfig()
 		try:
 			self.content.destroy()
+			self.curPwdFrame.destroy()
 		except Exception:
 			pass
 		self.content = Frame(self.mainwindow)
@@ -611,15 +611,13 @@ class App:
 		if tkMessageBox.askyesno("Reboot camera", "Are you sure you want to\nreboot camera?\n\nThis will close C&C"):
 			tosend = '{"msg_id":2,"token":%s, "type":"dev_reboot", "param":"on"}' %self.token
 			self.srv.send(tosend)
-			time.sleep(1)
-			sys.exit()
+			self.quit()
 
 	def ActionFactory(self):
 		if tkMessageBox.askyesno("Reboot camera", "Are you sure you want to\nRESET CAMERA TO FACTORY SETTINGS?\n\nThis will close C&C"):
 			tosend = '{"msg_id":2,"token":%s, "type":"restore_factory_settings", "param":"on"}' %self.token
 			self.srv.send(tosend)
-			time.sleep(1)
-			sys.exit()
+			self.quit()
 
 	def ActionPhoto(self):
 		myid = 769
@@ -733,6 +731,7 @@ class App:
 		self.GetAllConfig()
 		try:
 			self.content.destroy()
+			self.curPwdFrame.destroy()
 		except Exception:
 			pass
 		
@@ -950,6 +949,7 @@ class App:
 			self.Cameramenu.entryconfig(2, state="normal")
 			self.Cameramenu.entryconfig(3, state="normal")
 			if self.ExpertMode:
+				self.FileButtonUpload.config(state="normal")
 				self.FileButtonCwd.config(state="normal")
 				self.Expertmenu.entryconfig(2, state="normal")
 			self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
@@ -965,6 +965,7 @@ class App:
 			self.Cameramenu.entryconfig(2, state="normal")
 			self.Cameramenu.entryconfig(3, state="normal")
 			if self.ExpertMode:
+				self.FileButtonUpload.config(state="normal")
 				self.FileButtonCwd.config(state="normal")
 				self.Expertmenu.entryconfig(2, state="normal")
 			self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
@@ -980,6 +981,7 @@ class App:
 		self.Cameramenu.entryconfig(2, state=DISABLED)
 		self.Cameramenu.entryconfig(3, state=DISABLED)
 		if self.ExpertMode:
+			self.FileButtonUpload.config(state=DISABLED)
 			self.FileButtonCwd.config(state=DISABLED)
 			self.Expertmenu.entryconfig(2, state=DISABLED)
 		self.ListboxFileName.bind("<Double-Button-1>", self.noaction)
@@ -987,6 +989,132 @@ class App:
 		self.thread_FileDown = threading.Thread(target=self.FileDownloadThread)
 		self.thread_FileDown.start()
 					
+
+	def FileUpReport(self, bytes_so_far, chunk_size, total_size, FileTP):
+		percent = float(bytes_so_far) / total_size
+		percent = round(percent*100, 2)
+		thistime = time.time()
+		if (thistime - self.FileTime > 0.01) and self.connected:
+			ActualSpeed = float(chunk_size/(thistime-self.FileTime))
+			self.FileSpeed.append(ActualSpeed)
+			self.FileTime = thistime
+			pre = 0
+			AvgSpeed = sum(self.FileSpeed) / float(len(self.FileSpeed))
+			
+			remaining = int((total_size-bytes_so_far) / AvgSpeed)
+
+			self.FileProgress.config(text="Uploading %s at %s/s (%0.2f%%, %ss left)" %(FileTP, self.GetPres(Value=AvgSpeed), percent, remaining), bg=self.defaultbg)
+
+		if bytes_so_far >= total_size:
+			self.FileProgress.config(text="%s uploaded" %(FileTP), bg="#ddffdd")
+
+	def FileUpChunk(self, chunk_size=0, report_hook=None):
+		if chunk_size == 0:
+			chunk_size = self.DefaultChunkSize
+		ThisFileContent = self.FileToUpload.read()
+		total_size = len(ThisFileContent)
+		self.FileTime = time.time()
+		self.FileSpeed = []
+		ThisPosition = 0
+		bytes_so_far = 0
+		
+		ThisFileName = self.FileToUpload.name.split("/")[-1:][0]
+		ThisFileName = ThisFileName.encode('utf-8')
+		ThisFileName = ThisFileName.replace('–','-')# hackish fix for windows file name after copying file
+		ThisMD5 = hashlib.md5(ThisFileContent).hexdigest()
+		tosend = '{"msg_id":1286,"token":%s,"md5sum":"%s", "param":"%s", "offset":%s, "size":%s}' %(self.token, ThisMD5, ThisFileName, ThisPosition, total_size)
+		resp = self.Comm(tosend)
+		if int(resp["rval"]) == 0:
+			while self.connected:
+				EndPosition = ThisPosition+chunk_size
+				if EndPosition > total_size:
+					EndPosition = total_size
+				DataSend = ThisFileContent[ThisPosition:EndPosition]
+				self.Datasrv.sendall(DataSend)
+				ThisPosition = EndPosition
+				if report_hook:
+					report_hook(ThisPosition, chunk_size, total_size, ThisFileName)
+				if EndPosition == total_size:
+					break
+			while 1:
+				if 7 in self.JsonData.keys():
+					if "type" in self.JsonData[7].keys():
+						if self.JsonData[7]["type"] == "put_file_complete":
+							self.JsonData[7]["type"] = ""
+							break
+		else:
+			self.FileProgress.config(text="File upload rejected!", bg="#ffdddd")
+		self.FileToUpload.close()
+
+	def FileUploadThread(self):
+		try:
+			self.Datasrv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create data socket
+			self.Datasrv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+			self.Datasrv.connect((self.camaddr, self.camdataport)) #open data socket
+
+			self.FileProgress.config(text="Uploading", bg=self.defaultbg)
+			time.sleep(1)
+			try:
+				self.FileUpChunk(report_hook=self.FileUpReport)
+			except Exception as e:
+				print e
+				self.FileProgress.config(text="File upload failed!", bg="#ffdddd")
+				pass
+			self.Datasrv.close()
+			self.MainButtonControl.config(state="normal")
+			self.MainButtonConfigure.config(state="normal")
+			self.MainButtonFiles.config(state="normal")
+			self.FileButtonDownload.config(state="normal")
+			self.FileButtonDelete.config(state="normal")
+			self.Cameramenu.entryconfig(1, state="normal")
+			self.Cameramenu.entryconfig(2, state="normal")
+			self.Cameramenu.entryconfig(3, state="normal")
+			if self.ExpertMode:
+				self.FileButtonUpload.config(state="normal")
+				self.FileButtonCwd.config(state="normal")
+				self.Expertmenu.entryconfig(2, state="normal")
+			self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
+			self.FilePrintList()
+							
+		except Exception:
+			self.FileProgress.config(text="File upload failed!", bg="#ffdddd")
+			self.MainButtonControl.config(state="normal")
+			self.MainButtonConfigure.config(state="normal")
+			self.MainButtonFiles.config(state="normal")
+			self.FileButtonDownload.config(state="normal")
+			self.FileButtonDelete.config(state="normal")
+			self.Cameramenu.entryconfig(1, state="normal")
+			self.Cameramenu.entryconfig(2, state="normal")
+			self.Cameramenu.entryconfig(3, state="normal")
+			if self.ExpertMode:
+				self.FileButtonUpload.config(state="normal")
+				self.FileButtonCwd.config(state="normal")
+				self.Expertmenu.entryconfig(2, state="normal")
+			self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
+	
+
+
+	def FileUpload(self, *args):
+		self.FileToUpload = None
+		self.FileToUpload = tkFileDialog.askopenfile(mode='rb', title="Select a file to upload")
+		if self.FileToUpload:
+			self.MainButtonControl.config(state=DISABLED)
+			self.MainButtonConfigure.config(state=DISABLED)
+			self.MainButtonFiles.config(state=DISABLED)
+			self.FileButtonDownload.config(state=DISABLED)
+			self.FileButtonDelete.config(state=DISABLED)
+			self.Cameramenu.entryconfig(1, state=DISABLED)
+			self.Cameramenu.entryconfig(2, state=DISABLED)
+			self.Cameramenu.entryconfig(3, state=DISABLED)
+			if self.ExpertMode:
+				self.FileButtonUpload.config(state=DISABLED)
+				self.FileButtonCwd.config(state=DISABLED)
+				self.Expertmenu.entryconfig(2, state=DISABLED)
+			self.ListboxFileName.bind("<Double-Button-1>", self.noaction)
+		
+			self.thread_FileUp = threading.Thread(target=self.FileUploadThread)
+			self.thread_FileUp.start()
+
 			
 	def FileCwd(self):
 		if len(self.ListboxFileName.curselection()) == 1:
@@ -1097,6 +1225,7 @@ class App:
 				CamFiles.append([filetype, filename,filesize,filepre,filedate])
 			pres = ["B", "kB", "MB", "GB", "TB"]
 			if self.ExpertMode != "":
+				self.curPwdLabel.config(text=self.curPwd.replace('\/','/')[-35:])
 				for ThisCamDir in sorted(CamDirs):
 					self.ListboxFileType.insert(END, "Folder")
 					self.ListboxFileName.insert(END, ThisCamDir[0])
@@ -1114,6 +1243,7 @@ class App:
 		self.ActualAction = "FileManager"
 		try:
 			self.content.destroy()
+			self.curPwdFrame.destroy()
 		except Exception:
 			pass
 		self.content = Frame(self.mainwindow)
@@ -1126,11 +1256,18 @@ class App:
 		if self.MediaDir != "":
 			tosend = '{"msg_id":1283,"token":%s,"param":"\/var\/www\/DCIM\/%s"}' %(self.token, self.MediaDir) #lets seth final path in camera
 			self.curPwd = self.Comm(tosend)["pwd"]
+		if self.ExpertMode != "":
+			self.curPwdFrame = Frame(self.topbuttons)
+			self.curPwdLabel = Label(self.curPwdFrame, width=30, bd=1, relief=RIDGE, bg="#aaaaff", text=self.curPwd.replace('\/','/')[-35:], anchor=W)
+			self.curPwdLabel.pack(side=TOP)
+			self.curPwdFrame.pack(side=RIGHT, padx=10)
 		self.FileCreateList()
 		self.FilePrintList()
 		self.FileButtonDownload = Button(self.content, text="Download", width=8, command=self.FileDownload)
 		self.FileButtonDownload.pack(side=LEFT, padx=5, pady=5)
 		if self.ExpertMode != "":
+			self.FileButtonUpload = Button(self.content, text="Upload", width=11, command=self.FileUpload)
+			self.FileButtonUpload.pack(side=LEFT, padx=5, pady=5)
 			self.FileButtonCwd = Button(self.content, text="Change folder", width=11, bg="#ffff66", command=self.FileCwd)
 			self.FileButtonCwd.pack(side=LEFT, padx=5, pady=5)
 		self.FileButtonDelete = Button(self.content, text="DELETE", width=6, bg="#ff6666", command=self.FileDelete)
