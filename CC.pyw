@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.6.2"
+AppVersion = "0.6.3"
  
  
 
@@ -378,6 +378,8 @@ class App:
 		Jtosend = json.loads(tosend)
 		msgid = Jtosend["msg_id"]
 		self.JsonData[msgid] = ""
+		if self.DebugMode:
+			self.DebugLog("ToSend", tosend)
 		self.srv.send(tosend)
 		while self.JsonData[msgid]=="":continue
 		if self.JsonData[msgid]["rval"] == -4: #wrong token, ackquire new one & resend - "workaround" for camera insisting on tokens
@@ -927,6 +929,12 @@ class App:
 			filek.write(chunk)
 			if report_hook:
 				report_hook(bytes_so_far, chunk_size, total_size, FileTP)
+			while 1:
+				if 7 in self.JsonData.keys():
+					if "type" in self.JsonData[7].keys():
+						if self.JsonData[7]["type"] == "get_file_complete":
+							self.JsonData[7]["type"] = ""
+							break
 			if bytes_so_far >= total_size:
 				break
 			else:
