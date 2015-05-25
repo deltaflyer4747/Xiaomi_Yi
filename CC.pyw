@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.6.1"
+AppVersion = "0.6.2"
  
  
 
@@ -310,6 +310,8 @@ class App:
 				if self.Jsonflip == 1 and self.Jsoncounter == 0:
 					try:
 						data_dec = json.loads(self.Jsondata)
+						if self.DebugMode:
+							self.DebugLog("JsonData", data_dec)
 						self.Jsondata = ""
 						self.Jsonflip = 0
 						if "msg_id" in data_dec.keys():
