@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.6.0"
+AppVersion = "0.6.1"
  
  
 
@@ -22,6 +22,7 @@ class App:
 		self.JsonData = {}
 		self.MediaDir = ""
 		self.ExpertMode = ""
+		self.DebugMode = False
 		self.DefaultChunkSize = 8192
 		self.ZoomLevelValue = ""
 		self.ZoomLevelOldValue = ""
@@ -74,6 +75,19 @@ class App:
 	def noaction(self, *args):
 		return				
 
+	def DebugLog(self, msg, e):
+		filek = open("debug.txt", "a")
+		filek.write("%s >%s<\n" %(msg,e))
+		filek.close()
+
+
+	def DebugToggle(self, *args):
+		if self.DebugMode:
+			self.DebugMode = False
+		else:
+			self.DebugMode = True
+		self.Settings(add={"DebugMode":self.DebugMode})
+
 	def Settings(self, add="", rem=""):
 		if add == "" and rem == "": #nothing to add or remove = initial call
 			try: #open the settings file (if exists) and read the settings
@@ -84,9 +98,9 @@ class App:
 				
 				for pname in ConfigFile.keys():
 					pvalue = ConfigFile[pname]
-					if pname in ("camaddr", "camauto", "camport", "camdataport", "custom_vlc_path", "DefaultChunkSize", "ExpertMode"): setattr(self, pname, pvalue)
+					if pname in ("camaddr", "camauto", "camport", "camdataport", "custom_vlc_path", "DebugMode", "DefaultChunkSize", "ExpertMode"): setattr(self, pname, pvalue)
 				if not {"camaddr", "camauto", "camport", "camdataport", "custom_vlc_path"} <= set(ConfigFile.keys()): raise
-			except Exception: #no settings file yet, lets create default one & set defaults
+			except Exception: #no settings file yet or file structure mismatch - lets create default one & set defaults
 				filek = open("settings.cfg","w")
 				ConfigFile = '{"camaddr":"192.168.42.1","camauto":"","camport":7878,"camdataport":8787,"custom_vlc_path":"."}'
 				filek.write(ConfigFile) 
@@ -188,7 +202,7 @@ class App:
 					try:
 						thisoptions = re.findall('settable:(.+)', thisresponse)[0]
 						allparams = thisoptions.replace("\\/","/").split("#")
-					except:
+					except Exception:
 						allparams = ""
 					self.camsettableconfig[param]=allparams
 
@@ -273,7 +287,9 @@ class App:
 						raise Exception('Connection', 'failed') #throw an exception
 
 
-		except Exception as c:
+		except Exception as e:
+			if self.DebugMode:
+				self.DebugLog("CamConn", e)
 			self.connected = False
 			tkMessageBox.showerror("Connect", "Cannot connect to the address specified")
 			self.srv.close()
@@ -330,7 +346,9 @@ class App:
 							self.JsonData[data_dec["msg_id"]] = data_dec
 						else:
 							raise Exception('Unknown','data')
-					except Exception:
+					except Exception as e:
+						if self.DebugMode:
+							self.DebugLog("UnkData", e)
 						print data
 		except Exception:
 			self.connected = False
@@ -343,7 +361,7 @@ class App:
 		self.Jsonflip = 0
 		initcounter = 0
 		self.srv.send('{"msg_id":257,"token":0}') #auth to the camera
-		while initcounter < 1000:
+		while initcounter < 300:
 			self.JsonLoop()
 			initcounter += 1
 			if len(self.JsonData) > 0:
@@ -412,6 +430,10 @@ class App:
 		self.ExpertmenuChunkSize = Menu(self.menu, tearoff=0)
 		self.Expertmenu.add_cascade(label="File transfer chunk size", menu=self.ExpertmenuChunkSize, underline=0)
 		self.ShowExpertChunkMenu()
+		if self.DebugMode:
+			self.Expertmenu.add_command(label="Disable debug mode", command=self.DebugToggle, underline=8)			
+		else:
+			self.Expertmenu.add_command(label="Enable debug mode", command=self.DebugToggle, underline=7)			
 		self.Expertmenu.add_command(label="Activate camera jetpack", command=self.ActionInfo, state=DISABLED, underline=0)
 		self.Expertmenu.add_command(label="Explode camera", command=self.ActionInfo, state=DISABLED, underline=0)
 		self.Expertmenu.add_command(label="Kill ALL puppies", command=self.ActionInfo, state=DISABLED, underline=0)
@@ -683,7 +705,9 @@ class App:
 						tkMessageBox.showinfo("Live View", "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %(self.camaddr))
 				else:
 					tkMessageBox.showinfo("Live View", "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %(self.camaddr))
-		except Exception:
+		except Exception as e:
+			if self.DebugMode:
+				self.DebugLog("VlcNotFound", e)
 			tkMessageBox.showinfo("Live View", "VLC Player not found\nUse your preferred player to view:\n rtsp://%s:554/live" %(self.camaddr))
 	
 
@@ -934,7 +958,8 @@ class App:
 					try:
 						self.FileDownChunk(report_hook=self.FileDownReport, FileTP=FileTP)
 					except Exception as e:
-						print e
+						if self.DebugMode:
+							self.DebugLog("FileDChnk", e)
 						self.FileProgress.config(text="File download failed!", bg="#ffdddd")
 						pass
 					self.Datasrv.close()
@@ -954,7 +979,9 @@ class App:
 				self.Expertmenu.entryconfig(2, state="normal")
 			self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
 							
-		except Exception:
+		except Exception as e:
+			if self.DebugMode:
+				self.DebugLog("FileDThrd", e)
 			self.FileProgress.config(text="File download failed!", bg="#ffdddd")
 			self.MainButtonControl.config(state="normal")
 			self.MainButtonConfigure.config(state="normal")
@@ -1057,7 +1084,8 @@ class App:
 			try:
 				self.FileUpChunk(report_hook=self.FileUpReport)
 			except Exception as e:
-				print e
+				if self.DebugMode:
+					self.DebugLog("FileUChnk", e)
 				self.FileProgress.config(text="File upload failed!", bg="#ffdddd")
 				pass
 			self.Datasrv.close()
@@ -1076,7 +1104,9 @@ class App:
 			self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
 			self.FilePrintList()
 							
-		except Exception:
+		except Exception as e:
+			if self.DebugMode:
+				self.DebugLog("FileDThrd", e)
 			self.FileProgress.config(text="File upload failed!", bg="#ffdddd")
 			self.MainButtonControl.config(state="normal")
 			self.MainButtonConfigure.config(state="normal")
@@ -1149,7 +1179,8 @@ class App:
 					self.FileProgress.config(text="Deleted", bg=self.defaultbg)
 			self.FileProgress.config(text="Deleted")
 		except Exception as e:
-			print e
+			if self.DebugMode:
+				self.DebugLog("FileDel", e)
 			self.FileProgress.config(text="File deleting failed!", bg="#ffdddd")
 		self.UpdateUsage()
 		self.FilePrintList()
