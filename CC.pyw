@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.6.4"
+AppVersion = "0.6.5"
  
  
 
@@ -98,18 +98,19 @@ class App:
 				
 				for pname in ConfigFile.keys():
 					pvalue = ConfigFile[pname]
-					if pname in ("camaddr", "camauto", "camport", "camdataport", "custom_vlc_path", "DebugMode", "DefaultChunkSize", "ExpertMode"): setattr(self, pname, pvalue)
-				if not {"camaddr", "camauto", "camport", "camdataport", "custom_vlc_path"} <= set(ConfigFile.keys()): raise
+					if pname in ("camaddr", "camauto", "camport", "camdataport", "camwebport", "custom_vlc_path", "DebugMode", "DefaultChunkSize", "ExpertMode"): setattr(self, pname, pvalue)
+				if not {"camaddr", "camauto", "camport", "camdataport", "camwebport", "custom_vlc_path"} <= set(ConfigFile.keys()): raise
 			except Exception: #no settings file yet or file structure mismatch - lets create default one & set defaults
 				filek = open("settings.cfg","w")
-				ConfigFile = '{"camaddr":"192.168.42.1","camauto":"","camport":7878,"camdataport":8787,"custom_vlc_path":"."}'
+				ConfigFile = '{"camaddr":"192.168.42.1","camauto":"","camport":7878,"camdataport":8787,"camwebport":80,"custom_vlc_path":"."}'
 				filek.write(ConfigFile) 
 				filek.close()
 				self.camaddr = "192.168.42.1"
 				self.camauto = ""
 				self.camport = 7878
 				self.camdataport = 8787
-				self.custom_vlc_path = "."
+				self.camwebport = 80
+				self.custom_vlc_path = "."                                                                             
 		else:
 			if len(add)>0:
 				filek = open("settings.cfg","r")
@@ -138,6 +139,7 @@ class App:
 		self.addrv3 = StringVar()
 		self.addrv4 = StringVar()
 		self.addrv5 = StringVar()
+		self.addrv6 = StringVar()
 		b = Button(self.camconn, text="Connect C&C", width=11, command=self.CamConnect)
 		b.focus_set()
 		b.grid(row=1, column=1, padx=10, pady=2)
@@ -164,11 +166,16 @@ class App:
 		l.grid(row=2, column=4)
 		e3 = Entry(self.camconn, textvariable=self.addrv4, width=4)
 		e3.grid(row=2, column=5)
+		l = Label(self.camconn, width=10, text="Web Port:", anchor=E)
+		l.grid(row=3, column=4)
+		e4 = Entry(self.camconn, textvariable=self.addrv6, width=4)
+		e4.grid(row=3, column=5)
 		self.addrv1.set(self.camaddr)
 		self.addrv2.set(self.camport)
 		self.addrv3.set(self.camauto)
 		self.addrv4.set(self.camdataport)
 		self.addrv5.set(self.custom_vlc_path)
+		self.addrv6.set(self.camwebport)
 		self.camconn.pack(side=TOP, fill=X)
 		if self.camauto == "on":
 			self.CamConnect()
@@ -236,6 +243,7 @@ class App:
 			self.camauto = self.addrv3.get() #read autoconnect status
 			self.camdataport = int(self.addrv4.get()) #read data port from inputbox & convert to integer
 			self.custom_vlc_path = self.addrv5.get() #read custom_vlc_path
+			self.camwebport = int(self.addrv6.get()) #read web port from inputbox & convert to integer
 			socket.setdefaulttimeout(5)
 			self.srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create socket
 			self.srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -251,7 +259,7 @@ class App:
 				if self.connected:
 					if self.token == "":
 						break
-					ToWrite = {"camaddr":self.camaddr, "camauto":self.camauto, "camport":self.camport, "camdataport":self.camdataport, "custom_vlc_path":self.custom_vlc_path}
+					ToWrite = {"camaddr":self.camaddr, "camauto":self.camauto, "camport":self.camport, "camdataport":self.camdataport, "camwebport":self.camwebport, "custom_vlc_path":self.custom_vlc_path}
 					self.Settings(add=ToWrite)
 					self.status.config(text="Connected") #display status message in statusbar
 					self.status.update_idletasks()
@@ -902,52 +910,88 @@ class App:
 
 
 	def FileDownChunk(self, chunk_size=0, report_hook=None, FileTP=""):
-		if chunk_size == 0:
-			chunk_size = self.DefaultChunkSize
-		tosend = '{"msg_id":1285,"token":%s,"param":"%s", "offset":0, "fetch_size":%s}' %(self.token, FileTP, self.FileSize[FileTP])
-		resp = self.Comm(tosend)
-		total_size = int(resp["size"])
-		bytes_so_far = 0
-		
-		ThisFileName = "Files/%s" %FileTP
-		filek = open(ThisFileName, "wb")
 		self.FileTime = time.time()
 		self.FileSpeed = []
-		towrite = ""
-		while self.connected:
-			this_size = int(chunk_size)
-			if this_size+bytes_so_far > total_size:
-				this_size = total_size-bytes_so_far
-			chunk = bytearray(this_size)
-			view = memoryview(chunk)
-			while this_size:
-				nbytes = self.Datasrv.recv_into(view, this_size)
-				view = view[nbytes:]
-				this_size -= nbytes
-				bytes_so_far += nbytes
+		if chunk_size == 0:
+			chunk_size = self.DefaultChunkSize
+		thisPwd = self.curPwd.replace('\/','/')
+		if thisPwd.startswith("/var/www/DCIM") or thisPwd.startswith("/tmp/fuse_d/DCIM"):
+			if thisPwd.startswith("/var/www/DCIM") and len(thisPwd)>13:
+				thisPwd = re.findall("/var/www/(.+)", thisPwd)[0]
+			elif thisPwd.startswith("/tmp/fuse_d/DCIM") and len(thisPwd)>16:
+				thisPwd = re.findall("/tmp/fuse_d/(.+)", thisPwd)[0]
+			thisUrl = 'http://%s:%s/%s/%s' %(self.camaddr, self.camwebport, thisPwd, FileTP)
+			response = urllib2.urlopen(thisUrl)
 
-			towrite += chunk
-			if report_hook:
-				report_hook(bytes_so_far, chunk_size, total_size, FileTP)
-			if bytes_so_far >= total_size:
-				break
+			total_size = response.info().getheader('Content-Length').strip()
+			total_size = int(total_size)
+			bytes_so_far = 0
+			
+			ThisFileName = "Files/%s" %FileTP
+			filek = open(ThisFileName, "wb")
+			self.FileTime = time.time()
+			while 1:
+				chunk = response.read(chunk_size)
+				bytes_so_far += len(chunk)
+				
+				if not chunk:
+					break
+				filek.write(chunk)
+				if report_hook:
+					report_hook(bytes_so_far, chunk_size, total_size, FileTP)
+			filek.close()
+			if bytes_so_far == total_size:
+				self.FileProgress.config(text="%s downloaded" %(FileTP), bg="#ddffdd")
+			
 
-		tmp = 0
-		while 1:
-			if 7 in self.JsonData.keys():
-				if "type" in self.JsonData[7].keys():
-					if self.JsonData[7]["type"] == "get_file_complete":
-						self.JsonData[7]["type"] = ""
-						self.FileProgress.config(text="%s downloaded" %(FileTP), bg="#ddffdd")
-						filek.write(chunk)
-						break
-			time.sleep(1)
-			tmp += 1
-			if tmp >= 5:
-				raise Exception('File download', 'failed') #throw an exception
-				break
-		filek.close()
 
+		else:
+			self.Datasrv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create data socket
+			self.Datasrv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+			self.Datasrv.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+			self.Datasrv.connect((self.camaddr, self.camdataport)) #open data socket
+			tosend = '{"msg_id":1285,"token":%s,"param":"%s", "offset":0, "fetch_size":%s}' %(self.token, FileTP, self.FileSize[FileTP])
+			resp = self.Comm(tosend)
+			total_size = int(resp["size"])
+			bytes_so_far = 0
+			
+			ThisFileName = "Files/%s" %FileTP
+			filek = open(ThisFileName, "wb")
+			towrite = ""
+			while self.connected:
+				this_size = int(chunk_size)
+				if this_size+bytes_so_far > total_size:
+					this_size = total_size-bytes_so_far
+				chunk = bytearray(this_size)
+				view = memoryview(chunk)
+				while this_size:
+					nbytes = self.Datasrv.recv_into(view, this_size)
+					view = view[nbytes:]
+					this_size -= nbytes
+					bytes_so_far += nbytes
+	
+				towrite += chunk
+				if report_hook:
+					report_hook(bytes_so_far, chunk_size, total_size, FileTP)
+				if bytes_so_far >= total_size:
+					break
+	
+			tmp = 0
+			while 1:
+				if 7 in self.JsonData.keys():
+					if "type" in self.JsonData[7].keys():
+						if self.JsonData[7]["type"] == "get_file_complete":
+							self.JsonData[7]["type"] = ""
+							self.FileProgress.config(text="%s downloaded" %(FileTP), bg="#ddffdd")
+							filek.write(chunk)
+							break
+				time.sleep(1)
+				tmp += 1
+				if tmp >= 5:
+					raise Exception('File download', 'failed') #throw an exception
+					break
+			filek.close()
+			self.Datasrv.close()
 	
 
 	def FileDownloadThread(self):
@@ -963,11 +1007,6 @@ class App:
 				os.mkdir("Files",0o777)
 			for FileTP in FilesToProcess:
 				if not FileTP.endswith("/"):
-					self.Datasrv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create data socket
-					self.Datasrv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-					self.Datasrv.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-					self.Datasrv.connect((self.camaddr, self.camdataport)) #open data socket
-	
 					self.FileProgress.config(text="Downloading", bg=self.defaultbg)
 					try:
 						self.FileDownChunk(report_hook=self.FileDownReport, FileTP=FileTP)
@@ -976,7 +1015,6 @@ class App:
 							self.DebugLog("FileDChnk", e)
 						self.FileProgress.config(text="File download failed!", bg="#ffdddd")
 						pass
-					self.Datasrv.close()
 				else:
 					self.FileProgress.config(text="You cannot download a folder!", bg="#ffdddd")
 			self.MainButtonControl.config(state="normal")
