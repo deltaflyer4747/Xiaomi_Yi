@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.6.3"
+AppVersion = "0.6.4"
  
  
 
@@ -23,7 +23,7 @@ class App:
 		self.MediaDir = ""
 		self.ExpertMode = ""
 		self.DebugMode = False
-		self.DefaultChunkSize = 8192
+		self.DefaultChunkSize = 4096
 		self.ZoomLevelValue = ""
 		self.ZoomLevelOldValue = ""
 		self.thread_zoom = ""
@@ -179,7 +179,7 @@ class App:
 		while Value > 1024:
 			Value = Value/float(1024)
 			option += 1
-		pres = ["B", "KB", "MB", "GB", "TB"]
+		pres = ["B", "kB", "MB", "GB", "TB"]
 		return("%.1f%s" %(Value, pres[option]))
 
 	def UpdateCheck(self):
@@ -239,6 +239,7 @@ class App:
 			socket.setdefaulttimeout(5)
 			self.srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create socket
 			self.srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+			self.srv.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 			self.srv.connect((self.camaddr, self.camport)) #open socket
 			self.thread_read = threading.Thread(target=self.JsonReader)
 			self.thread_read.setDaemon(True)
@@ -888,7 +889,7 @@ class App:
 		percent = round(percent*100, 2)
 		thistime = time.time()
 		if (thistime - self.FileTime > 0.01) and self.connected:
-			ActualSpeed = float(chunk_size/(thistime-self.FileTime))
+			ActualSpeed = float(chunk_size	/(thistime-self.FileTime))
 			self.FileSpeed.append(ActualSpeed)
 			self.FileTime = thistime
 			pre = 0
@@ -898,51 +899,53 @@ class App:
 
 			self.FileProgress.config(text="Downloading %s at %s/s (%0.2f%%, %ss left)" %(FileTP, self.GetPres(Value=AvgSpeed), percent, remaining), bg=self.defaultbg)
 
-		if bytes_so_far >= total_size:
-			self.FileProgress.config(text="%s downloaded" %(FileTP), bg="#ddffdd")
+
 
 	def FileDownChunk(self, chunk_size=0, report_hook=None, FileTP=""):
 		if chunk_size == 0:
 			chunk_size = self.DefaultChunkSize
-		tosend = '{"msg_id":1285,"token":%s,"param":"%s", "offset":0, "fetch_size":%s}' %(self.token, FileTP, chunk_size)
+		tosend = '{"msg_id":1285,"token":%s,"param":"%s", "offset":0, "fetch_size":%s}' %(self.token, FileTP, self.FileSize[FileTP])
 		resp = self.Comm(tosend)
 		total_size = int(resp["size"])
-		this_size = int(resp["rem_size"])
 		bytes_so_far = 0
 		
 		ThisFileName = "Files/%s" %FileTP
 		filek = open(ThisFileName, "wb")
 		self.FileTime = time.time()
 		self.FileSpeed = []
+		towrite = ""
 		while self.connected:
+			this_size = int(chunk_size)
+			if this_size+bytes_so_far > total_size:
+				this_size = total_size-bytes_so_far
 			chunk = bytearray(this_size)
 			view = memoryview(chunk)
 			while this_size:
-				if self.connected:
-					nbytes = self.Datasrv.recv_into(view, this_size)
+				nbytes = self.Datasrv.recv_into(view, this_size)
 				view = view[nbytes:]
 				this_size -= nbytes
-			bytes_so_far += len(chunk)
-			
-			if not chunk:
-				break
-			filek.write(chunk)
+				bytes_so_far += nbytes
+
+			towrite += chunk
 			if report_hook:
 				report_hook(bytes_so_far, chunk_size, total_size, FileTP)
-			while 1:
-				if 7 in self.JsonData.keys():
-					if "type" in self.JsonData[7].keys():
-						if self.JsonData[7]["type"] == "get_file_complete":
-							self.JsonData[7]["type"] = ""
-							break
 			if bytes_so_far >= total_size:
 				break
-			else:
-				tosend = '{"msg_id":1285,"token":%s,"param":"%s", "offset":%s, "fetch_size":%s}' %(self.token, FileTP, bytes_so_far, chunk_size)
-				resp = self.Comm(tosend)
-				this_size = int(resp["rem_size"])
-					
 
+		tmp = 0
+		while 1:
+			if 7 in self.JsonData.keys():
+				if "type" in self.JsonData[7].keys():
+					if self.JsonData[7]["type"] == "get_file_complete":
+						self.JsonData[7]["type"] = ""
+						self.FileProgress.config(text="%s downloaded" %(FileTP), bg="#ddffdd")
+						filek.write(chunk)
+						break
+			time.sleep(1)
+			tmp += 1
+			if tmp >= 5:
+				raise Exception('File download', 'failed') #throw an exception
+				break
 		filek.close()
 
 	
@@ -962,6 +965,7 @@ class App:
 				if not FileTP.endswith("/"):
 					self.Datasrv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create data socket
 					self.Datasrv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+					self.Datasrv.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 					self.Datasrv.connect((self.camaddr, self.camdataport)) #open data socket
 	
 					self.FileProgress.config(text="Downloading", bg=self.defaultbg)
@@ -1063,16 +1067,17 @@ class App:
 		resp = self.Comm(tosend)
 		if int(resp["rval"]) == 0:
 			while self.connected:
-				EndPosition = ThisPosition+chunk_size
-				if EndPosition > total_size:
-					EndPosition = total_size
-				DataSend = ThisFileContent[ThisPosition:EndPosition]
+				ThisSize = chunk_size
+				if ThisSize+ThisPosition > total_size:
+					ThisSize = total_size - ThisPosition
+				DataSend = buffer(ThisFileContent, ThisPosition, ThisSize)
 				self.Datasrv.sendall(DataSend)
-				ThisPosition = EndPosition
+				ThisPosition += ThisSize
 				if report_hook:
 					report_hook(ThisPosition, chunk_size, total_size, ThisFileName)
-				if EndPosition == total_size:
+				if ThisPosition == total_size:
 					break
+
 			while 1:
 				if 7 in self.JsonData.keys():
 					if "type" in self.JsonData[7].keys():
@@ -1087,6 +1092,7 @@ class App:
 		try:
 			self.Datasrv = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #create data socket
 			self.Datasrv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+			self.Datasrv.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 			self.Datasrv.connect((self.camaddr, self.camdataport)) #open data socket
 
 			self.FileProgress.config(text="Uploading", bg=self.defaultbg)
@@ -1251,6 +1257,7 @@ class App:
 				dirdate = re.findall(' bytes\|(.+)',DirListing[dirname])[0]
 				CamDirs.append([dirname, dirdate])
 
+			self.FileSize = {}
 			for filename in FileListing.keys():
 				filetype = "File"
 				for ThisFileType in self.FileTypes.keys():
@@ -1258,6 +1265,7 @@ class App:
 						filetype = self.FileTypes[ThisFileType]
 
 				filesize, filedate = re.findall('(.+) bytes\|(.+)',FileListing[filename])[0]
+				self.FileSize[filename]=filesize
 				filesize = float(filesize)
 				filepre = 0
 				while filesize > 1024:
