@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.6.6"
+AppVersion = "0.6.7"
  
  
 
@@ -23,7 +23,7 @@ class App:
 		self.MediaDir = ""
 		self.ExpertMode = ""
 		self.DebugMode = False
-		self.DefaultChunkSize = 4096
+		self.DefaultChunkSize = 8192
 		self.ZoomLevelValue = ""
 		self.ZoomLevelOldValue = ""
 		self.thread_zoom = ""
@@ -88,6 +88,14 @@ class App:
 		else:
 			self.DebugMode = True
 		self.Settings(add={"DebugMode":self.DebugMode})
+
+	def UnbindAll(self):
+		self.master.unbind_all("<MouseWheel>")
+		self.master.unbind("u")
+		self.master.unbind("<Delete>")
+		self.master.unbind("<Return>")
+		self.master.unbind("<BackSpace>")
+		
 
 	def Settings(self, add="", rem=""):
 		if add == "" and rem == "": #nothing to add or remove = initial call
@@ -500,12 +508,18 @@ class App:
 		self.mainwindow = Frame(self.master, width=550, height=400)
 		self.topbuttons = Frame(self.mainwindow, bg="#aaaaff")
 		if self.SDOK:
-			self.MainButtonControl = Button(self.topbuttons, text="Control", width=7, command=self.MenuControl)
+			self.MainButtonControl = Button(self.topbuttons, text="Control", width=7, command=self.MenuControl, underline=6)
+			self.master.bind("l",self.MenuControl)
+			self.master.bind("L",self.MenuControl)
 			self.MainButtonControl.pack(side=LEFT, padx=10, ipadx=5, pady=5)
-		self.MainButtonConfigure = Button(self.topbuttons, text="Configure", width=7, command=self.MenuConfig)
+		self.MainButtonConfigure = Button(self.topbuttons, text="Configure", width=7, command=self.MenuConfig, underline=5)
+		self.master.bind("g",self.MenuConfig)
+		self.master.bind("G",self.MenuConfig)
 		self.MainButtonConfigure.pack(side=LEFT, padx=10, ipadx=5, pady=5)
 		if self.SDOK:
-			self.MainButtonFiles = Button(self.topbuttons, text="Files", width=7, command=self.FileManager)
+			self.MainButtonFiles = Button(self.topbuttons, text="Files", width=7, command=self.FileManager, underline=0)
+			self.master.bind("f",self.FileManager)
+			self.master.bind("F",self.FileManager)
 			self.MainButtonFiles.pack(side=LEFT, padx=10, ipadx=5, pady=5)
 		self.topbuttons.pack(side=TOP, fill=X)
 		self.mainwindow.pack(side=TOP, fill=X)
@@ -516,7 +530,8 @@ class App:
 			l.pack(side=TOP, fill=BOTH)
 
 	
-	def MenuControl(self):
+	def MenuControl(self, *args):
+		self.UnbindAll()
 		self.master.geometry("475x250+300+75")
 		self.ReadConfig()
 		try:
@@ -760,10 +775,14 @@ class App:
 					menu.add_command(label=value, command=lambda value=value: self.config_VidResValue.set(value))
 
 
-	def myfunction(self, event):
+	def MenuConfig_WindowSize(self, event):
 		self.controlcanvas.configure(scrollregion=self.controlcanvas.bbox("all"),width=740,height=485)
+	
+	def MenuConfig_WheelScroll(self, event):
+		self.controlcanvas.yview_scroll(-1*(event.delta/120), "units")
 
-	def MenuConfig(self):
+	def MenuConfig(self, *args):
+		self.UnbindAll()
 		self.master.geometry("760x550+300+75")
 		self.ReadConfig()
 		self.GetAllConfig()
@@ -800,13 +819,14 @@ class App:
 		self.controlselect = Frame(self.content)
 		self.controlselect.place(x=0,y=0)
 		self.controlcanvas = Canvas(self.controlselect)
+		self.controlcanvas.bind_all("<MouseWheel>", self.MenuConfig_WheelScroll)
 		self.controloptions = Frame(self.controlcanvas)
 		self.config_scrollbar=Scrollbar(self.controlselect,orient="vertical",command=self.controlcanvas.yview)
 		self.controlcanvas.configure(yscrollcommand=self.config_scrollbar.set)	
 		self.config_scrollbar.pack(side="right",fill="y")
 		self.controlcanvas.pack(side="left")
 		self.controlcanvas.create_window((0,0),window=self.controloptions,anchor='nw')
-		self.controloptions.bind("<Configure>",self.myfunction)
+		self.controloptions.bind("<Configure>",self.MenuConfig_WindowSize)
 
 		self.controlbuttons = Frame(self.controloptions, width=445, height=20)
 		self.config_apply = Button(self.controlbuttons, text="Apply", width=7, command=self.MenuConfig_Apply)
@@ -887,8 +907,14 @@ class App:
 
 		self.content.pack(side=TOP, fill=X)
 	
-	
+	def FileYScrollKey(self, *args):
+		self.ListboxFileType.yview_moveto(args[0])
+		self.ListboxFileSize.yview_moveto(args[0])
+		self.ListboxFileDate.yview_moveto(args[0])
+		self.FilesScrollbar.set(*args)
+
 	def FileYScroll(self, *args):
+		apply(self.ListboxFileType.yview, args)
 		apply(self.ListboxFileName.yview, args)
 		apply(self.ListboxFileSize.yview, args)
 		apply(self.ListboxFileDate.yview, args)
@@ -1031,6 +1057,8 @@ class App:
 				self.FileButtonCwd.config(state="normal")
 				self.Expertmenu.entryconfig(2, state="normal")
 			self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
+			self.ListboxFileName.bind("<Return>", self.FileDoubleClick)
+			self.ListboxFileName.bind("<BackSpace>", self.KeyCwd)
 							
 		except Exception as e:
 			if self.DebugMode:
@@ -1049,7 +1077,9 @@ class App:
 				self.FileButtonCwd.config(state="normal")
 				self.Expertmenu.entryconfig(2, state="normal")
 			self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
-	
+			self.ListboxFileName.bind("<Return>", self.FileDoubleClick)
+			self.ListboxFileName.bind("<BackSpace>", self.KeyCwd)
+
 
 	def FileDownload(self, *args):
 		self.MainButtonControl.config(state=DISABLED)
@@ -1065,6 +1095,8 @@ class App:
 			self.FileButtonCwd.config(state=DISABLED)
 			self.Expertmenu.entryconfig(2, state=DISABLED)
 		self.ListboxFileName.bind("<Double-Button-1>", self.noaction)
+		self.ListboxFileName.bind("<Return>", self.noaction)
+		self.ListboxFileName.bind("<BackSpace>", self.noaction)
 		
 		self.thread_FileDown = threading.Thread(target=self.FileDownloadThread)
 		self.thread_FileDown.start()
@@ -1157,6 +1189,8 @@ class App:
 				self.FileButtonCwd.config(state="normal")
 				self.Expertmenu.entryconfig(2, state="normal")
 			self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
+			self.ListboxFileName.bind("<Return>", self.FileDoubleClick)
+			self.ListboxFileName.bind("<BackSpace>", self.KeyCwd)
 			self.FilePrintList()
 							
 		except Exception as e:
@@ -1176,7 +1210,9 @@ class App:
 				self.FileButtonCwd.config(state="normal")
 				self.Expertmenu.entryconfig(2, state="normal")
 			self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
-	
+			self.ListboxFileName.bind("<Return>", self.FileDoubleClick)
+			self.ListboxFileName.bind("<BackSpace>", self.KeyCwd)
+
 
 
 	def FileUpload(self, *args):
@@ -1196,6 +1232,8 @@ class App:
 				self.FileButtonCwd.config(state=DISABLED)
 				self.Expertmenu.entryconfig(2, state=DISABLED)
 			self.ListboxFileName.bind("<Double-Button-1>", self.noaction)
+			self.ListboxFileName.bind("<Return>", self.noaction)
+			self.ListboxFileName.bind("<BackSpace>", self.noaction)
 		
 			self.thread_FileUp = threading.Thread(target=self.FileUploadThread)
 			self.thread_FileUp.start()
@@ -1208,6 +1246,12 @@ class App:
 				tosend = '{"msg_id":1283,"token":%s,"param":"%s"}' %(self.token, cwd)
 				self.curPwd = self.Comm(tosend)["pwd"]
 				self.FilePrintList()
+			
+	def KeyCwd(self, *args):
+		if self.curPwd != "/":
+			tosend = '{"msg_id":1283,"token":%s,"param":"%s"}' %(self.token, "../")
+			self.curPwd = self.Comm(tosend)["pwd"]
+			self.FilePrintList()
 			
 	def FileDoubleClick(self, *args):
 		if len(self.ListboxFileName.curselection()) == 1:
@@ -1326,12 +1370,15 @@ class App:
 		self.FileCreateListLabel()
 
 		self.FilesScrollbar = Scrollbar(self.filelist, orient=VERTICAL)
-		self.ListboxFileType = Listbox(self.filelist, yscrollcommand=self.FilesScrollbar.set, height=8, width=12, bd=0, bg="#ffffff", fg="#000000", activestyle=NONE, highlightcolor="#ffffff", highlightthickness=0, selectborderwidth=0, selectbackground="#ffffff", selectforeground="#000000")
-		self.ListboxFileName = Listbox(self.filelist, yscrollcommand=self.FilesScrollbar.set, selectmode=EXTENDED, height=27, width=37, bd=0, bg="#ffffff", fg="#000000", highlightcolor="#ffffff", highlightthickness=0)
-		self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
-		self.ListboxFileSize = Listbox(self.filelist, yscrollcommand=self.FilesScrollbar.set, height=8, width=12, bd=0, bg="#ffffff", fg="#000000", activestyle=NONE, highlightcolor="#ffffff", highlightthickness=0, selectborderwidth=0, selectbackground="#ffffff", selectforeground="#000000")
-		self.ListboxFileDate = Listbox(self.filelist, yscrollcommand=self.FilesScrollbar.set, height=8, width=30, bd=0, bg="#ffffff", fg="#000000", activestyle=NONE, highlightcolor="#ffffff", highlightthickness=0, selectborderwidth=0, selectbackground="#ffffff", selectforeground="#000000")
 		self.FilesScrollbar.config(command=self.FileYScroll)
+		self.ListboxFileType = Listbox(self.filelist, height=8, width=12, bd=0, bg="#ffffff", fg="#000000", activestyle=NONE, highlightcolor="#ffffff", highlightthickness=0, selectborderwidth=0, selectbackground="#ffffff", selectforeground="#000000")
+		self.ListboxFileName = Listbox(self.filelist, yscrollcommand=self.FileYScrollKey, selectmode=EXTENDED, height=27, width=37, bd=0, bg="#ffffff", fg="#000000", highlightcolor="#ffffff", highlightthickness=0)
+		self.ListboxFileName.bind("<Double-Button-1>", self.FileDoubleClick)
+		self.ListboxFileName.bind("<Return>", self.FileDoubleClick)
+		self.ListboxFileName.bind("<BackSpace>", self.KeyCwd)
+		self.ListboxFileName.focus_set()
+		self.ListboxFileSize = Listbox(self.filelist, height=8, width=12, bd=0, bg="#ffffff", fg="#000000", activestyle=NONE, highlightcolor="#ffffff", highlightthickness=0, selectborderwidth=0, selectbackground="#ffffff", selectforeground="#000000")
+		self.ListboxFileDate = Listbox(self.filelist, height=8, width=30, bd=0, bg="#ffffff", fg="#000000", activestyle=NONE, highlightcolor="#ffffff", highlightthickness=0, selectborderwidth=0, selectbackground="#ffffff", selectforeground="#000000")
 		self.FilesScrollbar.pack(side=RIGHT, fill=Y)
 		self.ListboxFileType.pack(side=LEFT, padx=10, fill=BOTH, expand=0)
 		self.ListboxFileName.pack(side=LEFT, padx=15, fill=BOTH, expand=0)
@@ -1403,7 +1450,8 @@ class App:
 				self.ListboxFileSize.insert(END, self.GetPres(ThisCamFile[2]))
 				self.ListboxFileDate.insert(END, ThisCamFile[3])
 
-	def FileManager(self):
+	def FileManager(self, *args):
+		self.UnbindAll()
 		self.master.geometry("760x550+300+75")
 		self.ActualAction = "FileManager"
 		try:
@@ -1431,11 +1479,14 @@ class App:
 		self.FileButtonDownload = Button(self.content, text="Download", width=8, command=self.FileDownload)
 		self.FileButtonDownload.pack(side=LEFT, padx=5, pady=5)
 		if self.ExpertMode != "":
-			self.FileButtonUpload = Button(self.content, text="Upload", width=11, command=self.FileUpload)
+			self.FileButtonUpload = Button(self.content, text="Upload", width=11, command=self.FileUpload, underline=0)
+			self.master.bind("u",self.FileUpload)
+			self.master.bind("U",self.FileUpload)
 			self.FileButtonUpload.pack(side=LEFT, padx=5, pady=5)
 			self.FileButtonCwd = Button(self.content, text="Change folder", width=11, bg="#ffff66", command=self.FileCwd)
 			self.FileButtonCwd.pack(side=LEFT, padx=5, pady=5)
 		self.FileButtonDelete = Button(self.content, text="DELETE", width=6, bg="#ff6666", command=self.FileDelete)
+		self.master.bind("<Delete>",self.FileDelete)
 		self.FileButtonDelete.pack(side=LEFT, padx=5, pady=5)
 		self.FileProgress = Label(self.content, width=60, anchor=W, bd=1, relief=SUNKEN, text="Select a file", bg=self.defaultbg)
 		self.FileProgress.pack(side=RIGHT, fill=X, padx=10)
