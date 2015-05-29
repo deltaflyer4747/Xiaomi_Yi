@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.6.5"
+AppVersion = "0.6.6"
  
  
 
@@ -27,6 +27,7 @@ class App:
 		self.ZoomLevelValue = ""
 		self.ZoomLevelOldValue = ""
 		self.thread_zoom = ""
+		self.FileSort = 7
 				
 		self.DonateUrl = "http://sw.deltaflyer.cz/donate.html"
 		self.GitUrl = "https://github.com/deltaflyer4747/Xiaomi_Yi"
@@ -34,7 +35,7 @@ class App:
 		self.ConfigInfo = {"auto_low_light":"Automaticaly increase exposure time in low-light conditions", "auto_power_off":"Power down camera after specified time of inactivity", "burst_capture_number":"Specify ammount of images taken in Burst mode", "buzzer_ring":"Enable/disable camera locator beacon", "buzzer_volume":"Volume of camera beep", "camera_clock":"Tick&Apply to set Camera clock to the same as this PC", "capture_default_mode":"Mode to enter when changing to Capture via system_default_mode/HW button", "capture_mode":"Changes behavior of \"Photo\" button", "emergency_file_backup":"Locks file when shock is detected-for car dashcam (related to \"loop_record\")", "led_mode":"Set preferred LED behavior", "loop_record":"Overwrites oldest files when memory card is full", "meter_mode":"Metering mode for exposure/white ballance", "osd_enable":"Overlay info to hdmi/TV out", "photo_quality":"Set quality of still images", "photo_size":"Set resolution of still images", "photo_stamp":"Overlay date and time of capture to still images", "precise_cont_time":"Delay between individual images in timelapse mode", "precise_selftime":"Set delay to capture in Timer mode", "preview_status":"Turn this on to enable LIVE view", "start_wifi_while_booted":"Enable WiFi on boot", "system_default_mode":"Mode for HW trigger to set when camera is turned on", "system_mode":"Current mode for HW trigger", "timelapse_video":"Create timelapse video from image taken every 2 seconds", "video_output_dev_type":"Select video out HDMI or AV out over USB, use same cable as SJ4000", "video_quality":"Set quality of video recordings", "video_rotate":"Rotate video by 180° (upsidedown mount)", "video_resolution":"video_resolution is limited by selected video_standard", "video_stamp":"Overlay date and time to video recordings", "video_standard":"video_standard limits possible video_resolution options", "warp_enable":"On = No fisheye (Compensation ON), Off = Fisheye (Compensation OFF)", "wifi_ssid":"WiFi network name; reboot camera after Apply to take effect", "wifi_password":"WiFi network password; reboot camera after Apply to take effect"}
 		self.ConfigTypes = {"auto_low_light":"checkbutton", "auto_power_off":"optionmenu", "burst_capture_number":"optionmenu", "buzzer_ring":"checkbutton", "buzzer_volume":"optionmenu", "camera_clock":"button", "capture_default_mode":"optionmenu", "emergency_file_backup":"checkbutton", "led_mode":"optionmenu", "loop_record":"checkbutton", "meter_mode":"optionmenu", "osd_enable":"checkbutton", "photo_quality":"optionmenu", "photo_size":"optionmenu", "photo_stamp":"optionmenu", "precise_cont_time":"optionmenu", "precise_selftime":"optionmenu", "preview_status":"checkbutton", "start_wifi_while_booted":"checkbutton", "system_default_mode":"radiobutton", "system_mode":"radiobutton", "timelapse_photo":"radiobutton", "timelapse_video":"radiobutton", "video_output_dev_type":"optionmenu", "video_quality":"optionmenu", "video_resolution":"optionmenu","video_rotate":"checkbutton", "video_stamp":"optionmenu", "video_standard":"radiobutton", "warp_enable":"checkbutton", "wifi_ssid":"entry", "wifi_password":"entry"}
 		self.ConfigIgnores = ["dev_reboot", "restore_factory_settings", "capture_mode", "precise_self_running"]
-		self.FileTypes = {"/":"Folder", ".bmp":"Image", ".ico":"Image", ".jpg":"Image", ".mka":"Audio", ".mkv":"Video", "mp3":"Audio", ".mp4":"Video", ".mpg":"Video", ".png":"Image", ".txt":"Text", "wav":"Audio"}
+		self.FileTypes = {"/":"Folder", ".ash":"Script", ".bmp":"Image", ".ico":"Image", ".jpg":"Image", ".mka":"Audio", ".mkv":"Video", "mp3":"Audio", ".mp4":"Video", ".mpg":"Video", ".png":"Image", ".txt":"Text", "wav":"Audio"}
 		self.ChunkSizes = [0.5,1,2,4,8,16,32,64,128,256]
 		self.master = master
 		self.master.geometry("445x250+300+75")
@@ -98,7 +99,7 @@ class App:
 				
 				for pname in ConfigFile.keys():
 					pvalue = ConfigFile[pname]
-					if pname in ("camaddr", "camauto", "camport", "camdataport", "camwebport", "custom_vlc_path", "DebugMode", "DefaultChunkSize", "ExpertMode"): setattr(self, pname, pvalue)
+					if pname in ("camaddr", "camauto", "camport", "camdataport", "camwebport", "custom_vlc_path", "DebugMode", "DefaultChunkSize", "ExpertMode","FileSort"): setattr(self, pname, pvalue)
 				if not {"camaddr", "camauto", "camport", "camdataport", "camwebport", "custom_vlc_path"} <= set(ConfigFile.keys()): raise
 			except Exception: #no settings file yet or file structure mismatch - lets create default one & set defaults
 				filek = open("settings.cfg","w")
@@ -1239,18 +1240,90 @@ class App:
 		self.UpdateUsage()
 		self.FilePrintList()
 	
+	def FileChangeOrderType(self):
+		if self.FileSort == 0: self.FileSort = 1
+		else: self.FileSort = 0
+		self.LabelFileType.destroy()
+		self.LabelFileName.destroy()
+		self.LabelFileSize.destroy()
+		self.LabelFileDate.destroy()
+		self.Settings(add={"FileSort":self.FileSort})
+		self.FileCreateListLabel()
+		self.FilePrintList()
+
+	def FileChangeOrderName(self):
+		if self.FileSort == 2: self.FileSort = 3
+		else: self.FileSort = 2
+		self.LabelFileType.destroy()
+		self.LabelFileName.destroy()
+		self.LabelFileSize.destroy()
+		self.LabelFileDate.destroy()
+		self.Settings(add={"FileSort":self.FileSort})
+		self.FileCreateListLabel()
+		self.FilePrintList()
+
+	def FileChangeOrderSize(self):
+		if self.FileSort == 4: self.FileSort = 5
+		else: self.FileSort = 4
+		self.LabelFileType.destroy()
+		self.LabelFileName.destroy()
+		self.LabelFileSize.destroy()
+		self.LabelFileDate.destroy()
+		self.Settings(add={"FileSort":self.FileSort})
+		self.FileCreateListLabel()
+		self.FilePrintList()
+
+	def FileChangeOrderDate(self):
+		if self.FileSort == 6: self.FileSort = 7
+		else: self.FileSort = 6
+		self.LabelFileType.destroy()
+		self.LabelFileName.destroy()
+		self.LabelFileSize.destroy()
+		self.LabelFileDate.destroy()
+		self.Settings(add={"FileSort":self.FileSort})
+		self.FileCreateListLabel()
+		self.FilePrintList()
+
+	def FileCreateListLabel(self):
+		if self.FileSort == 0:
+			self.LabelFileType = Button(self.LabelFileHead, width=14, height=1, text="Type ▲", anchor=S, command=self.FileChangeOrderType)
+		elif self.FileSort == 1:
+			self.LabelFileType = Button(self.LabelFileHead, width=14, height=1, text="Type ▼", anchor=S, command=self.FileChangeOrderType)
+		else:
+			self.LabelFileType = Button(self.LabelFileHead, width=14, height=1, text="Type", anchor=S, command=self.FileChangeOrderType)
+		self.LabelFileType.pack(side=LEFT)
+
+		if self.FileSort == 2:
+			self.LabelFileName = Button(self.LabelFileHead, width=35, height=1, text="Filename ▲", anchor=S, command=self.FileChangeOrderName)
+		elif self.FileSort == 3:
+			self.LabelFileName = Button(self.LabelFileHead, width=35, height=1, text="Filename ▼", anchor=S, command=self.FileChangeOrderName)
+		else:
+			self.LabelFileName = Button(self.LabelFileHead, width=35, height=1, text="Filename", anchor=S, command=self.FileChangeOrderName)
+		self.LabelFileName.pack(side=LEFT)
+
+		if self.FileSort == 4:
+			self.LabelFileSize = Button(self.LabelFileHead, width=12, height=1, text="Size ▲", anchor=S, command=self.FileChangeOrderSize)
+		elif self.FileSort == 5:
+			self.LabelFileSize = Button(self.LabelFileHead, width=12, height=1, text="Size ▼", anchor=S, command=self.FileChangeOrderSize)
+		else:
+			self.LabelFileSize = Button(self.LabelFileHead, width=12, height=1, text="Size", anchor=S, command=self.FileChangeOrderSize)
+		self.LabelFileSize.pack(side=LEFT)
+
+		if self.FileSort == 6:
+			self.LabelFileDate = Button(self.LabelFileHead, width=30, height=1, text="DateTime ▲", anchor=S, command=self.FileChangeOrderDate)
+		elif self.FileSort == 7:
+			self.LabelFileDate = Button(self.LabelFileHead, width=30, height=1, text="DateTime ▼", anchor=S, command=self.FileChangeOrderDate)
+		else:
+			self.LabelFileDate = Button(self.LabelFileHead, width=30, height=1, text="DateTime", anchor=S, command=self.FileChangeOrderDate)
+		self.LabelFileDate.pack(side=LEFT)        	
+	
+
 	def FileCreateList(self):
 		self.filelist = Frame(self.content, bg="#ffffff")
-		self.LabelFileHead = LabelFrame(self.filelist, bd=1, relief=SUNKEN, text="", width=760)
+		self.LabelFileHead = Frame(self.filelist, height=20)
+		self.LabelFileHead.pack_propagate(0)
 		self.LabelFileHead.pack(side=TOP, fill=X)
-		self.LabelFileName = Label(self.LabelFileHead, width=14, bd=1, relief=RIDGE, text="Type", anchor=CENTER)
-		self.LabelFileName.grid(column=0, row=0)
-		self.LabelFileName = Label(self.LabelFileHead, width=35, bd=1, relief=RIDGE, text="Filename", anchor=CENTER)
-		self.LabelFileName.grid(column=1, row=0)
-		self.LabelFileSize = Label(self.LabelFileHead, width=12, bd=1, relief=RIDGE, text="Size", anchor=CENTER)
-		self.LabelFileSize.grid(column=2, row=0)
-		self.LabelFileDate = Label(self.LabelFileHead, width=30, bd=1, relief=RIDGE, text="DateTime ▼", anchor=CENTER)
-		self.LabelFileDate.grid(column=3, row=0)        	
+		self.FileCreateListLabel()
 
 		self.FilesScrollbar = Scrollbar(self.filelist, orient=VERTICAL)
 		self.ListboxFileType = Listbox(self.filelist, yscrollcommand=self.FilesScrollbar.set, height=8, width=12, bd=0, bg="#ffffff", fg="#000000", activestyle=NONE, highlightcolor="#ffffff", highlightthickness=0, selectborderwidth=0, selectbackground="#ffffff", selectforeground="#000000")
@@ -1305,25 +1378,30 @@ class App:
 				filesize, filedate = re.findall('(.+) bytes\|(.+)',FileListing[filename])[0]
 				self.FileSize[filename]=filesize
 				filesize = float(filesize)
-				filepre = 0
-				while filesize > 1024:
-					filesize = filesize/float(1024)
-					filepre += 1
-				CamFiles.append([filetype, filename,filesize,filepre,filedate])
-			pres = ["B", "kB", "MB", "GB", "TB"]
+				CamFiles.append([filetype, filename, filesize, filedate])
 			if self.ExpertMode != "":
 				self.curPwdLabel.config(text=self.curPwd.replace('\/','/')[-35:])
+				
 				for ThisCamDir in sorted(CamDirs):
 					self.ListboxFileType.insert(END, "Folder")
 					self.ListboxFileName.insert(END, ThisCamDir[0])
 					self.ListboxFileSize.insert(END, "")
 					self.ListboxFileDate.insert(END, ThisCamDir[1])
 			
-			for ThisCamFile in sorted(CamFiles, key=itemgetter(4)):
+			if self.FileSort == 0: FileSorted = sorted(CamFiles, key=itemgetter(0))
+			elif self.FileSort == 1: FileSorted = sorted(CamFiles, key=itemgetter(0), reverse=True)
+			elif self.FileSort == 2: FileSorted = sorted(CamFiles, key=itemgetter(1))
+			elif self.FileSort == 3: FileSorted = sorted(CamFiles, key=itemgetter(1), reverse=True)
+			elif self.FileSort == 4: FileSorted = sorted(CamFiles, key=itemgetter(2))
+			elif self.FileSort == 5: FileSorted = sorted(CamFiles, key=itemgetter(2), reverse=True)
+			elif self.FileSort == 6: FileSorted = sorted(CamFiles, key=itemgetter(3))
+			elif self.FileSort == 7: FileSorted = sorted(CamFiles, key=itemgetter(3), reverse=True)
+
+			for ThisCamFile in FileSorted:
 				self.ListboxFileType.insert(END, ThisCamFile[0])
 				self.ListboxFileName.insert(END, ThisCamFile[1])
-				self.ListboxFileSize.insert(END, " %.1f%s" %(ThisCamFile[2], pres[ThisCamFile[3]]))
-				self.ListboxFileDate.insert(END, ThisCamFile[4])
+				self.ListboxFileSize.insert(END, self.GetPres(ThisCamFile[2]))
+				self.ListboxFileDate.insert(END, ThisCamFile[3])
 
 	def FileManager(self):
 		self.master.geometry("760x550+300+75")
