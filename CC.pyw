@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.6.7"
+AppVersion = "0.6.8"
  
  
 
@@ -92,6 +92,7 @@ class App:
 	def UnbindAll(self):
 		self.master.unbind_all("<MouseWheel>")
 		self.master.unbind("u")
+		self.master.unbind("U")
 		self.master.unbind("<Delete>")
 		self.master.unbind("<Return>")
 		self.master.unbind("<BackSpace>")
@@ -286,15 +287,15 @@ class App:
 						self.SDOK = False
 						self.SDLabelText="No SD memory card inserted in camera!\n\nPlease power off camera, insert SD & restart C&C."
 		
+					self.Cameramenu.entryconfig(0, state="normal")
+					if self.ExpertMode == "":
+						self.Cameramenu.entryconfig(4, state="normal")
+					else:
+						self.ShowExpertMenu()
 					if self.SDOK == True:
-						self.Cameramenu.entryconfig(0, state="normal")
 						self.Cameramenu.entryconfig(1, state="normal")
 						self.Cameramenu.entryconfig(2, state="normal")
 						self.Cameramenu.entryconfig(3, state="normal")
-						if self.ExpertMode == "":
-							self.Cameramenu.entryconfig(4, state="normal")
-						else:
-							self.ShowExpertMenu()
 					self.MainWindow()
 					break
 				else:
@@ -747,9 +748,9 @@ class App:
 		self.config_ToChange = {}
 			
 	def MenuConfig_Commit(self, ThisOption, ThisValue):
-		tosend = '{"msg_id":2,"token":%s, "type":"%s", "param":"%s"}' %(self.token, ThisOption, ThisValue.replace("/","\\/"))
 		if ThisOption == "camera_clock":
 			ThisValue = time.strftime("%Y-%m-%d %H:%M:%S")
+		tosend = '{"msg_id":2,"token":%s, "type":"%s", "param":"%s"}' %(self.token, ThisOption, ThisValue.replace("/","\\/"))
 		self.ReadConfig()
 		self.Comm(tosend)
 
@@ -943,11 +944,15 @@ class App:
 			chunk_size = self.DefaultChunkSize
 		thisPwd = self.curPwd.replace('\/','/')
 		if thisPwd.startswith("/var/www/DCIM") or thisPwd.startswith("/tmp/fuse_d/DCIM"):
-			if thisPwd.startswith("/var/www/DCIM") and len(thisPwd)>13:
+			print len(thisPwd)
+			if thisPwd.startswith("/var/www/DCIM") and len(thisPwd)>=13:
 				thisPwd = re.findall("/var/www/(.+)", thisPwd)[0]
-			elif thisPwd.startswith("/tmp/fuse_d/DCIM") and len(thisPwd)>16:
+			elif thisPwd.startswith("/tmp/fuse_d/DCIM") and len(thisPwd)>=16:
 				thisPwd = re.findall("/tmp/fuse_d/(.+)", thisPwd)[0]
 			thisUrl = 'http://%s:%s/%s/%s' %(self.camaddr, self.camwebport, thisPwd, FileTP)
+			print thisUrl
+			if self.DebugMode:
+				self.DebugLog("FileDUrl", thisUrl)			
 			response = urllib2.urlopen(thisUrl)
 
 			total_size = response.info().getheader('Content-Length').strip()
