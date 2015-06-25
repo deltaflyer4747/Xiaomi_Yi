@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.1.0"
+AppVersion = "0.1.1"
  
  
 
@@ -64,7 +64,7 @@ class App:
 	def Settings(self, add="", rem=""):
 		if add == "" and rem == "": #nothing to add or remove = initial call
 			try: #open the settings file (if exists) and read the settings
-				filek = open("settings.cfg","r")
+				filek = open("Multisettings.cfg","r")
 				filet = filek.readlines()
 				filek.close()
 				a=1
@@ -76,7 +76,7 @@ class App:
 				
 			except Exception as e: #no settings file yet or file structure mismatch - lets create default one & set defaults
 				print e
-				filek = open("settings.cfg_example","w")
+				filek = open("Multisettings.cfg_example","w")
 				ConfigFile = '192.168.0.10 7878\n#192.168.0.11 7878'
 				filek.write(ConfigFile) 
 				filek.close()
