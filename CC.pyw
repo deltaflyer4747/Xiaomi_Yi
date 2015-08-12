@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.6.8"
+AppVersion = "0.6.9"
  
  
 
@@ -91,6 +91,8 @@ class App:
 
 	def UnbindAll(self):
 		self.master.unbind_all("<MouseWheel>")
+		self.master.unbind_all("<Button-4>")
+		self.master.unbind_all("<Button-5>")
 		self.master.unbind("u")
 		self.master.unbind("U")
 		self.master.unbind("<Delete>")
@@ -780,7 +782,12 @@ class App:
 		self.controlcanvas.configure(scrollregion=self.controlcanvas.bbox("all"),width=740,height=485)
 	
 	def MenuConfig_WheelScroll(self, event):
-		self.controlcanvas.yview_scroll(-1*(event.delta/120), "units")
+		if event.num == 5: # linux scroll down
+			self.controlcanvas.yview_scroll(1, "units")
+		elif event.num == 4: # linux scroll up
+			self.controlcanvas.yview_scroll(-1, "units")
+		else: # windows scroll event
+			self.controlcanvas.yview_scroll(-1*(event.delta/120), "units")
 
 	def MenuConfig(self, *args):
 		self.UnbindAll()
@@ -821,6 +828,8 @@ class App:
 		self.controlselect.place(x=0,y=0)
 		self.controlcanvas = Canvas(self.controlselect)
 		self.controlcanvas.bind_all("<MouseWheel>", self.MenuConfig_WheelScroll)
+		self.controlcanvas.bind_all("<Button-4>", self.MenuConfig_WheelScroll)
+		self.controlcanvas.bind_all("<Button-5>", self.MenuConfig_WheelScroll)
 		self.controloptions = Frame(self.controlcanvas)
 		self.config_scrollbar=Scrollbar(self.controlselect,orient="vertical",command=self.controlcanvas.yview)
 		self.controlcanvas.configure(yscrollcommand=self.config_scrollbar.set)	
@@ -989,7 +998,6 @@ class App:
 			
 			ThisFileName = "Files/%s" %FileTP
 			filek = open(ThisFileName, "wb")
-			towrite = ""
 			while self.connected:
 				this_size = int(chunk_size)
 				if this_size+bytes_so_far > total_size:
@@ -1002,7 +1010,6 @@ class App:
 					this_size -= nbytes
 					bytes_so_far += nbytes
 	
-				towrite += chunk
 				if report_hook:
 					report_hook(bytes_so_far, chunk_size, total_size, FileTP)
 				if bytes_so_far >= total_size:
