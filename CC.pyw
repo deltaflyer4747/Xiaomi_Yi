@@ -3,7 +3,7 @@
 #
 # Res andy
 
-AppVersion = "0.6.9"
+AppVersion = "0.6.10"
  
  
 
@@ -33,7 +33,7 @@ class App:
 		self.GitUrl = "https://github.com/deltaflyer4747/Xiaomi_Yi"
 		self.UpdateUrl = "https://raw.githubusercontent.com/deltaflyer4747/Xiaomi_Yi/master/version.txt"
 		self.ConfigInfo = {"auto_low_light":"Automaticaly increase exposure time in low-light conditions", "auto_power_off":"Power down camera after specified time of inactivity", "burst_capture_number":"Specify ammount of images taken in Burst mode", "buzzer_ring":"Enable/disable camera locator beacon", "buzzer_volume":"Volume of camera beep", "camera_clock":"Tick&Apply to set Camera clock to the same as this PC", "capture_default_mode":"Mode to enter when changing to Capture via system_default_mode/HW button", "capture_mode":"Changes behavior of \"Photo\" button", "emergency_file_backup":"Locks file when shock is detected-for car dashcam (related to \"loop_record\")", "led_mode":"Set preferred LED behavior", "loop_record":"Overwrites oldest files when memory card is full", "meter_mode":"Metering mode for exposure/white ballance", "osd_enable":"Overlay info to hdmi/TV out", "photo_quality":"Set quality of still images", "photo_size":"Set resolution of still images", "photo_stamp":"Overlay date and time of capture to still images", "precise_cont_time":"Delay between individual images in timelapse mode", "precise_selftime":"Set delay to capture in Timer mode", "preview_status":"Turn this on to enable LIVE view", "start_wifi_while_booted":"Enable WiFi on boot", "system_default_mode":"Mode for HW trigger to set when camera is turned on", "system_mode":"Current mode for HW trigger", "timelapse_video":"Create timelapse video from image taken every 2 seconds", "video_output_dev_type":"Select video out HDMI or AV out over USB, use same cable as SJ4000", "video_quality":"Set quality of video recordings", "video_rotate":"Rotate video by 180° (upsidedown mount)", "video_resolution":"video_resolution is limited by selected video_standard", "video_stamp":"Overlay date and time to video recordings", "video_standard":"video_standard limits possible video_resolution options", "warp_enable":"On = No fisheye (Compensation ON), Off = Fisheye (Compensation OFF)", "wifi_ssid":"WiFi network name; reboot camera after Apply to take effect", "wifi_password":"WiFi network password; reboot camera after Apply to take effect"}
-		self.ConfigTypes = {"auto_low_light":"checkbutton", "auto_power_off":"optionmenu", "burst_capture_number":"optionmenu", "buzzer_ring":"checkbutton", "buzzer_volume":"optionmenu", "camera_clock":"button", "capture_default_mode":"optionmenu", "emergency_file_backup":"checkbutton", "led_mode":"optionmenu", "loop_record":"checkbutton", "meter_mode":"optionmenu", "osd_enable":"checkbutton", "photo_quality":"optionmenu", "photo_size":"optionmenu", "photo_stamp":"optionmenu", "precise_cont_time":"optionmenu", "precise_selftime":"optionmenu", "preview_status":"checkbutton", "start_wifi_while_booted":"checkbutton", "system_default_mode":"radiobutton", "system_mode":"radiobutton", "timelapse_photo":"radiobutton", "timelapse_video":"radiobutton", "video_output_dev_type":"optionmenu", "video_quality":"optionmenu", "video_resolution":"optionmenu","video_rotate":"checkbutton", "video_stamp":"optionmenu", "video_standard":"radiobutton", "warp_enable":"checkbutton", "wifi_ssid":"entry", "wifi_password":"entry"}
+		self.ConfigTypes = {"auto_low_light":"checkbutton", "auto_power_off":"optionmenu", "burst_capture_number":"optionmenu", "buzzer_ring":"checkbutton", "buzzer_volume":"optionmenu", "camera_clock":"button", "capture_default_mode":"optionmenu", "emergency_file_backup":"checkbutton", "led_mode":"optionmenu", "loop_record":"checkbutton", "meter_mode":"optionmenu", "osd_enable":"checkbutton", "photo_quality":"optionmenu", "photo_size":"optionmenu", "photo_stamp":"optionmenu", "precise_cont_time":"optionmenu", "precise_selftime":"optionmenu", "preview_status":"checkbutton", "start_wifi_while_booted":"checkbutton", "system_default_mode":"radiobutton", "system_mode":"radiobutton", "timelapse_photo":"radiobutton", "timelapse_video":"radiobutton", "timelapse_video_duration":"entry", "video_output_dev_type":"optionmenu", "video_quality":"optionmenu", "video_resolution":"optionmenu","video_rotate":"checkbutton", "video_stamp":"optionmenu", "video_standard":"radiobutton", "warp_enable":"checkbutton", "wifi_ssid":"entry", "wifi_password":"entry"}
 		self.ConfigIgnores = ["dev_reboot", "restore_factory_settings", "capture_mode", "precise_self_running"]
 		self.FileTypes = {"/":"Folder", ".ash":"Script", ".bmp":"Image", ".ico":"Image", ".jpg":"Image", ".mka":"Audio", ".mkv":"Video", "mp3":"Audio", ".mp4":"Video", ".mpg":"Video", ".png":"Image", ".txt":"Text", "wav":"Audio"}
 		self.ChunkSizes = [0.5,1,2,4,8,16,32,64,128,256]
@@ -901,6 +901,10 @@ class App:
 						ValueBox = Entry(ThisFrame, textvariable=self.Config_WiPW, width=25)
 						ValueBox.grid(row=row,column=1)
 						self.status.append((ValueBox,self.Config_WiPW))
+					else:
+						ValueBox = Entry(ThisFrame, textvariable=ThisValue, width=25)
+						ValueBox.grid(row=row,column=1)
+						self.status.append((ValueBox,ThisValue))
 			
 			if ThisOption in self.ConfigInfo:
 				ThisHint = Label(ThisFrame, width=62, text="*%s" %self.ConfigInfo[ThisOption], anchor=W).grid(row=row, column=2, padx=10)
@@ -953,13 +957,11 @@ class App:
 			chunk_size = self.DefaultChunkSize
 		thisPwd = self.curPwd.replace('\/','/')
 		if thisPwd.startswith("/var/www/DCIM") or thisPwd.startswith("/tmp/fuse_d/DCIM"):
-			print len(thisPwd)
 			if thisPwd.startswith("/var/www/DCIM") and len(thisPwd)>=13:
 				thisPwd = re.findall("/var/www/(.+)", thisPwd)[0]
 			elif thisPwd.startswith("/tmp/fuse_d/DCIM") and len(thisPwd)>=16:
 				thisPwd = re.findall("/tmp/fuse_d/(.+)", thisPwd)[0]
 			thisUrl = 'http://%s:%s/%s/%s' %(self.camaddr, self.camwebport, thisPwd, FileTP)
-			print thisUrl
 			if self.DebugMode:
 				self.DebugLog("FileDUrl", thisUrl)			
 			response = urllib2.urlopen(thisUrl)
@@ -1040,6 +1042,9 @@ class App:
 				FileIds = self.ListboxFileName.curselection()
 			except Exception:
 				pass
+# fix for web port by luckylz https://forum.dashcamtalk.com/threads/yicam-can-not-visit-by-http-webport-any-more.13356
+		tosend = '{"msg_id":259,"param":"none_force","token":%s}' %(self.token)
+		resp = self.Comm(tosend)
 		try:
 			FilesToProcess = [self.ListboxFileName.get(idx) for idx in FileIds]
 			if not os.path.isdir("Files"):
