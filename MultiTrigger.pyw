@@ -33,9 +33,9 @@ class App:
 		self.initcounter = {}
 		self.AllConnected = True
 				
-		self.DonateUrl = "http://sw.deltaflyer.cz/donate.html"
-		self.GitUrl = "https://github.com/deltaflyer4747/Xiaomi_Yi"
-		self.UpdateUrl = "https://raw.githubusercontent.com/deltaflyer4747/Xiaomi_Yi/master/Multi_version.txt"
+		self.DonateUrl = "https://github.com/bixscotte/yi.action.camera"
+		self.GitUrl = "https://github.com/bixscotte/yi.action.camera"
+		self.UpdateUrl = "https://github.com/bixscotte/yi.action.camera"
 		self.master = master
 		self.master.geometry("445x250+300+75")
 		self.master.wm_title("Xiaomi Yi Multitrigger by Andy_S | ver %s" %AppVersion)
